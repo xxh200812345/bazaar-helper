@@ -23,6 +23,7 @@ RUNTIME_DIR = BASE_DIR / "runtime"
 STATE_PATH = RUNTIME_DIR / "game_state.json"
 EXAMPLE_STATE_PATH = BASE_DIR / "examples" / "game_state.example.json"
 MISSING_EVENTS_PATH = RUNTIME_DIR / "missing_events.json"
+OBSERVED_EVENT_GRAPH_PATH = RUNTIME_DIR / "observed_event_graph.json"
 AUTO_BUILD_PREFIX = "Auto"
 STAGE_LABELS_ZH = {
     "early": "前期",
@@ -35,6 +36,18 @@ RARITY_LABELS_ZH = {
     "gold": "黄金",
     "diamond": "钻石",
     "legendary": "传奇",
+    
+}
+RESOURCE_LABELS_ZH = {
+    "gold": "金币",
+    "exp": "经验",
+    "experience": "经验",
+    "health": "生命",
+    "max_health": "最大生命",
+    "healthmax": "最大生命",
+    "income": "收入",
+    "healthregen": "再生",
+    "regen": "再生",
 }
 
 
@@ -473,6 +486,100 @@ def role_label(role: str | None) -> str:
     }.get(role or "", role or "")
 
 
+def load_observed_event_graph() -> dict[str, Any]:
+    if not OBSERVED_EVENT_GRAPH_PATH.exists():
+        return {}
+
+    try:
+        data = json.loads(OBSERVED_EVENT_GRAPH_PATH.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError:
+        return {}
+
+    return data if isinstance(data, dict) else {}
+
+
+def format_resource_rewards(resource_rewards: dict[str, Any]) -> str:
+    if not isinstance(resource_rewards, dict) or not resource_rewards:
+        return ""
+
+    parts: list[str] = []
+
+    for key, value in resource_rewards.items():
+        if value in (None, "", 0):
+            continue
+
+        label = RESOURCE_LABELS_ZH.get(str(key).lower(), str(key))
+
+        if isinstance(value, float) and value.is_integer():
+            value_text = str(int(value))
+        else:
+            value_text = str(value)
+
+        parts.append(f"+{value_text} {label}")
+
+    return "，".join(parts)
+
+
+def summarize_parent_child_options(parent_graph: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(parent_graph, dict):
+        return []
+
+    children = parent_graph.get("children", [])
+    if not isinstance(children, list):
+        return []
+
+    result: list[dict[str, Any]] = []
+
+    for child in children:
+        if not isinstance(child, dict):
+            continue
+
+        resource_rewards = child.get("resource_rewards", {})
+        reward_text = format_resource_rewards(resource_rewards)
+
+        name = child.get("name") or ""
+        if not name:
+            source_id = str(child.get("source_id") or "")
+            name = f"未知子选项 {source_id[:8]}" if source_id else "未知子选项"
+
+        result.append(
+            {
+                "name": name,
+                "source_id": child.get("source_id", ""),
+                "kind": child.get("kind", ""),
+                "card_type": child.get("card_type", ""),
+                "description": child.get("description", ""),
+                "resource_rewards": resource_rewards,
+                "reward_text": reward_text,
+                "unresolved": bool(child.get("unresolved", False)),
+                "count": int(child.get("count", 0)),
+            }
+        )
+
+    return result
+
+
+def parent_event_reason_text(child_options: list[dict[str, Any]]) -> str:
+    if not child_options:
+        return "这是一个父事件，但当前还没有观察到可分析的子选项收益。"
+
+    parts: list[str] = []
+
+    for child in child_options[:5]:
+        name = child.get("name") or "未知子选项"
+        reward_text = child.get("reward_text") or ""
+        description = child.get("description") or ""
+
+        if reward_text:
+            parts.append(f"{name}：{reward_text}")
+        elif description:
+            parts.append(f"{name}：{description}")
+        else:
+            parts.append(f"{name}：暂未解析收益")
+
+    return "这是一个父事件，已根据运行时观察到的子选项估算可能收益：" + "；".join(parts)
+
+
 def tier_label(tier: Any) -> str:
     if tier in (None, "", "Unknown"):
         return "未评级"
@@ -517,6 +624,10 @@ def event_has_value_rule(event_data: dict[str, Any] | None) -> bool:
 def summarize_recommendation(data: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     event_name = result.get("event_name")
     event_data = data["events"].get(event_name) if event_name else None
+    observed_event_graph = load_observed_event_graph()
+    parent_graph = observed_event_graph.get(event_name) if event_name else None
+    child_options = summarize_parent_child_options(parent_graph)
+    is_parent_event = bool(child_options)
 
     known = bool(event_name) and event_name in data["events"]
     has_value_rule = event_has_value_rule(event_data) if known else False
@@ -534,6 +645,14 @@ def summarize_recommendation(data: dict[str, Any], result: dict[str, Any]) -> di
         base_reasons.insert(
             0,
             "事件数据缺失：这个事件没有在 events.json 中找到，应该已经记录到 runtime/missing_events.json，当前无法计算卡池、核心命中率或资源收益。",
+        )
+    elif is_parent_event:
+        event_rule_status = "parent_event"
+        recommendation = "Medium Value"
+        recommendation_label_zh = "父事件"
+        base_reasons.insert(
+            0,
+            parent_event_reason_text(child_options),
         )
     elif not has_value_rule:
         event_rule_status = "known_without_value_rule"
@@ -580,6 +699,8 @@ def summarize_recommendation(data: dict[str, Any], result: dict[str, Any]) -> di
             for card in result.get("owned_target_hits", [])[:6]
         ],
         "resource_rewards": result.get("resource_rewards", {}),
+        "child_options": child_options,
+        "parent_event_observed_count": int(parent_graph.get("observed_count", 0)) if isinstance(parent_graph, dict) else 0,
         "pool_stats": {
             "candidate_cards": int(pool_stats.get("total_pool_count", 0)),
             "build_relevant_cards": int(pool_stats.get("valuable_count", 0)),
@@ -1097,6 +1218,12 @@ HTML_PAGE = r"""<!doctype html>
         const ownedHits = (item.owned_target_hits || []).map((card) =>
           `<li>${card.display_name || card.name} <span class="muted">${card.tier || ""} ${card.role_label_zh || card.role || ""}${card.can_upgrade ? " · 可升级" : ""}${card.enchantments && card.enchantments.length ? " · " + card.enchantments.join(", ") : ""}</span></li>`
         ).join("");
+        const childOptions = (item.child_options || []).map((child) => {
+        const reward = child.reward_text ? ` <span class="muted">${child.reward_text}</span>` : "";
+        const desc = child.description && !child.reward_text ? ` <span class="muted">${child.description}</span>` : "";
+        const unresolved = child.unresolved ? ` <span class="muted">未完全解析</span>` : "";
+        return `<li>${child.name || "未知子选项"}${reward}${desc}${unresolved}</li>`;
+        }).join("");
         const reasons = (item.reasons || []).map((reason) => `<li>${reason}</li>`).join("");
         const sellGold = Number(stats.expected_sell_gold || 0);
         const sellText = sellGold > 0 ? ` · 卖价 +${sellGold.toFixed(1)}g` : "";
@@ -1109,6 +1236,7 @@ HTML_PAGE = r"""<!doctype html>
             <ul>${cards || "<li>暂无</li>"}</ul>
             <strong>已拥有命中</strong>
             <ul>${ownedHits || "<li>暂无</li>"}</ul>
+            ${childOptions ? `<strong>可能后续</strong><ul>${childOptions}</ul>` : ""}
             <strong>原因</strong>
             <ul>${reasons || "<li>暂无</li>"}</ul>
           </article>
