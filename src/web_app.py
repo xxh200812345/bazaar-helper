@@ -219,62 +219,98 @@ def normalize_payload_for_analysis(
 
 
 def normalize_event_options(data: dict[str, Any], payload: dict[str, Any]) -> list[str]:
+    """
+    把插件导出的事件选项归一化为 events.json 中的事件名。
+
+    注意：
+    - enc_ 通常是当前事件实例 ID。
+    - ste_ 通常是事件内部步骤 / 按钮选项。
+    - com_ 通常是战斗选项。
+    - pvp_ 通常是 PVP 对手。
+    当前推荐系统只分析事件/商店，不把 ste_/com_/pvp_ 当成事件。
+    """
+
     source_id_index = {
         str(source_id).lower(): event_name
         for event_name, event_data in data["events"].items()
         for source_id in event_data.get("source_ids", [])
     }
     event_names = set(data["events"])
-    raw_event_options = [str(option) for option in payload.get("event_options", [])]
-    current_instance_ids = [
-        option for option in raw_event_options if option.startswith("enc_")
+    translations = data.get("translations", {})
+    by_id = translations.get("by_id", {})
+
+    option_ids = [str(value) for value in payload.get("event_option_ids", [])]
+    template_ids = [str(value) for value in payload.get("event_option_template_ids", [])]
+    raw_event_options = [str(value) for value in payload.get("event_options", [])]
+    selected_encounter_ids = [
+        str(value)
+        for value in payload.get("selected_encounter_ids", [])
     ]
-    if current_instance_ids:
-        id_to_template = {
-            str(option_id): str(template_id)
-            for option_id, template_id in zip(
-                payload.get("event_option_ids", []),
-                payload.get("event_option_template_ids", []),
-            )
-        }
-        mapped_current_options = [
-            id_to_template.get(option_id, option_id)
-            for option_id in current_instance_ids
-        ]
-        named_current_options = [
-            option for option in raw_event_options if not option.startswith("enc_")
-        ]
-        options = [*mapped_current_options, *named_current_options]
-    else:
-        options = [
-            *payload.get("event_option_template_ids", []),
-            *payload.get("event_option_ids", []),
-            *payload.get("selected_encounter_ids", []),
-            *raw_event_options,
-        ]
+
+    candidates: list[str] = []
+
+    # 优先使用 template_id，因为 events.json 的 source_ids 一般记录的是模板 ID。
+    # 但要用对应的 instance id 判断它是不是事件内步骤 / 战斗 / PVP。
+    for index, template_id in enumerate(template_ids):
+        instance_id = option_ids[index] if index < len(option_ids) else ""
+
+        if is_non_event_runtime_id(instance_id):
+            continue
+
+        candidates.append(template_id)
+
+    # 兼容手动传入事件名的情况。
+    for option in raw_event_options:
+        if is_runtime_generated_id(option):
+            continue
+        candidates.append(option)
+
+    # 兜底：如果没有 template_id，才考虑 selected_encounter_ids。
+    # 但 enc_ 这种短实例 ID 本身通常不能直接映射到 events.json。
+    if not candidates:
+        for option in selected_encounter_ids:
+            if is_runtime_generated_id(option):
+                continue
+            candidates.append(option)
+
     normalized: list[str] = []
     seen: set[str] = set()
-    for option in options:
+
+    for option in candidates:
         option_text = str(option)
+
         event_name = source_id_index.get(option_text.lower())
-        if event_name is None:
-            if option_text in event_names:
-                event_name = option_text
-            elif option_text.startswith("enc_"):
-                continue
-            elif looks_like_uuid(option_text):
-                event_name = data.get("translations", {}).get("by_id", {}).get(
-                    option_text,
-                    option_text,
-                )
+
+        if event_name is None and option_text in event_names:
+            event_name = option_text
+
+        if event_name is None and looks_like_uuid(option_text):
+            translated = by_id.get(option_text)
+            if translated in event_names:
+                event_name = translated
             else:
-                event_name = option_text
+                event_name = translated or option_text
+
+        if event_name is None:
+            event_name = option_text
+
+        if is_runtime_generated_id(event_name):
+            continue
+
         if event_name in seen:
             continue
+
         seen.add(event_name)
         normalized.append(event_name)
+
     return normalized
 
+def is_runtime_generated_id(value: str) -> bool:
+    return value.startswith(("enc_", "ste_", "com_", "pvp_"))
+
+
+def is_non_event_runtime_id(value: str) -> bool:
+    return value.startswith(("ste_", "com_", "pvp_"))
 
 def looks_like_uuid(value: str) -> bool:
     return bool(
