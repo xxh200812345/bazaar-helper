@@ -222,6 +222,12 @@ def normalize_event_options(data: dict[str, Any], payload: dict[str, Any]) -> li
     """
     把插件导出的事件选项归一化为 events.json 中的事件名。
 
+    优先级：
+    1. event_options_detailed：插件新导出的结构化事件选项
+    2. event_option_template_ids + event_option_ids：旧平行数组兜底
+    3. event_options：兼容手动输入事件名
+    4. selected_encounter_ids：最后兜底
+
     注意：
     - enc_ 通常是当前事件实例 ID。
     - ste_ 通常是事件内部步骤 / 按钮选项。
@@ -249,23 +255,42 @@ def normalize_event_options(data: dict[str, Any], payload: dict[str, Any]) -> li
 
     candidates: list[str] = []
 
-    # 优先使用 template_id，因为 events.json 的 source_ids 一般记录的是模板 ID。
-    # 但要用对应的 instance id 判断它是不是事件内步骤 / 战斗 / PVP。
-    for index, template_id in enumerate(template_ids):
-        instance_id = option_ids[index] if index < len(option_ids) else ""
+    # 新逻辑：优先使用插件导出的结构化事件选项。
+    detailed_options = payload.get("event_options_detailed", [])
+    if isinstance(detailed_options, list):
+        for option in detailed_options:
+            if not is_detailed_encounter_option(option):
+                continue
 
-        if is_non_event_runtime_id(instance_id):
-            continue
+            template_id = str(option.get("template_id") or "")
+            name = str(option.get("name") or "")
+            option_id = str(option.get("id") or "")
 
-        candidates.append(template_id)
+            if template_id:
+                candidates.append(template_id)
+            elif name and not is_runtime_generated_id(name):
+                candidates.append(name)
+            elif option_id and not is_runtime_generated_id(option_id):
+                candidates.append(option_id)
+
+    # 旧逻辑兜底：如果没有 detailed，再用 template_id + instance_id。
+    if not candidates:
+        for index, template_id in enumerate(template_ids):
+            instance_id = option_ids[index] if index < len(option_ids) else ""
+
+            if is_non_event_runtime_id(instance_id):
+                continue
+
+            candidates.append(template_id)
 
     # 兼容手动传入事件名的情况。
-    for option in raw_event_options:
-        if is_runtime_generated_id(option):
-            continue
-        candidates.append(option)
+    if not candidates:
+        for option in raw_event_options:
+            if is_runtime_generated_id(option):
+                continue
+            candidates.append(option)
 
-    # 兜底：如果没有 template_id，才考虑 selected_encounter_ids。
+    # 最后兜底：如果没有 template_id，才考虑 selected_encounter_ids。
     # 但 enc_ 这种短实例 ID 本身通常不能直接映射到 events.json。
     if not candidates:
         for option in selected_encounter_ids:
@@ -304,6 +329,29 @@ def normalize_event_options(data: dict[str, Any], payload: dict[str, Any]) -> li
         normalized.append(event_name)
 
     return normalized
+
+def is_detailed_encounter_option(option: Any) -> bool:
+    """判断插件导出的 detailed option 是否是真正的事件选项。"""
+    if not isinstance(option, dict):
+        return False
+
+    option_id = str(option.get("id") or "")
+    kind = str(option.get("kind") or "").lower()
+    card_type = str(option.get("card_type") or "").lower()
+
+    if kind in {"step", "combat", "pvp"}:
+        return False
+
+    if kind == "encounter":
+        return True
+
+    if "encounter" in card_type:
+        return True
+
+    if option_id.startswith("enc_"):
+        return True
+
+    return False
 
 def is_runtime_generated_id(value: str) -> bool:
     return value.startswith(("enc_", "ste_", "com_", "pvp_"))
@@ -658,6 +706,7 @@ def record_missing_events(
             "raw_event_options": payload.get("event_options", []),
             "raw_event_option_ids": payload.get("event_option_ids", []),
             "raw_event_option_template_ids": payload.get("event_option_template_ids", []),
+            "raw_event_options_detailed": payload.get("event_options_detailed", []),
         }
 
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
