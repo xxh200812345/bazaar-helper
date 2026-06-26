@@ -282,10 +282,17 @@ def get_card_role_for_build(
     build_name: str,
     build_data: dict[str, Any],
 ) -> str:
-    build_roles = card_data.get("build_roles", {})
-    if build_name in build_roles:
-        role = build_roles[build_name]
-        return "unrelated" if role == "trap" else role
+    """
+    判断一张卡在当前 build 里的定位。
+
+    优先级：
+    1. builds.json 里的 core_cards / transition_cards / optional_cards
+    2. card_ratings.json 里的 build_roles
+    3. 默认 unrelated
+
+    这样社区阵容模板转换出来的 builds.json 会成为主要事实来源，
+    card_ratings.json 只作为补充评级和旧数据兼容。
+    """
 
     if card_name in build_data.get("core_cards", []):
         return "core"
@@ -293,6 +300,11 @@ def get_card_role_for_build(
         return "transition"
     if card_name in build_data.get("optional_cards", []):
         return "optional"
+
+    build_roles = card_data.get("build_roles", {})
+    if build_name in build_roles:
+        role = build_roles[build_name]
+        return "unrelated" if role == "trap" else role
 
     return "unrelated"
 
