@@ -106,7 +106,7 @@
         "Jules",
         "Stelle"
       ],
-      "shop_type": "small+medium+large",
+      "shop_type": "medium+large",
       "hero_filter": null,
       "shop_pool": {
         "reward_tags": [],
@@ -118,7 +118,6 @@
         ],
         "hero_scope": "current",
         "size_filter": [
-          "small",
           "medium",
           "large"
         ]
@@ -937,11 +936,11 @@
       "event_heroes": [
         "Pygmalien"
       ],
-      "shop_type": "gold",
+      "shop_type": "EconomyReference",
       "hero_filter": null,
       "shop_pool": {
         "reward_tags": [
-          "gold"
+          "EconomyReference"
         ],
         "match_mode": "any",
         "rarity_filter": null,
@@ -1021,7 +1020,7 @@
         "Jules",
         "Stelle"
       ],
-      "shop_type": "small+medium+large",
+      "shop_type": "small+medium",
       "hero_filter": null,
       "shop_pool": {
         "reward_tags": [],
@@ -1034,8 +1033,7 @@
         "hero_scope": "current",
         "size_filter": [
           "small",
-          "medium",
-          "large"
+          "medium"
         ]
       },
       "notes": "Sells small and medium items. Buys your Large items at +{aura.0} value."

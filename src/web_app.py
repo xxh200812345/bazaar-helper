@@ -23,6 +23,15 @@ RUNTIME_DIR = BASE_DIR / "runtime"
 STATE_PATH = RUNTIME_DIR / "game_state.json"
 EXAMPLE_STATE_PATH = BASE_DIR / "examples" / "game_state.example.json"
 MISSING_EVENTS_PATH = RUNTIME_DIR / "missing_events.json"
+OFFICIAL_CARDS_PATH = (
+    Path.home()
+    / "AppData"
+    / "LocalLow"
+    / "Tempo Storm"
+    / "The Bazaar"
+    / "cache"
+    / "cards.json"
+)
 OBSERVED_EVENT_GRAPH_PATH = RUNTIME_DIR / "observed_event_graph.json"
 AUTO_BUILD_PREFIX = "Auto"
 STAGE_LABELS_ZH = {
@@ -49,7 +58,7 @@ RESOURCE_LABELS_ZH = {
     "healthregen": "再生",
     "regen": "再生",
 }
-
+_OFFICIAL_CARDS_INDEX: dict[str, dict[str, Any]] | None = None
 
 def load_runtime_payload() -> tuple[dict[str, Any], Path]:
     path = STATE_PATH if STATE_PATH.exists() else EXAMPLE_STATE_PATH
@@ -380,6 +389,286 @@ def looks_like_uuid(value: str) -> bool:
             value,
         )
     )
+
+
+def load_observed_event_graph() -> dict[str, Any]:
+    if not OBSERVED_EVENT_GRAPH_PATH.exists():
+        return {}
+
+    try:
+        data = json.loads(OBSERVED_EVENT_GRAPH_PATH.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError:
+        return {}
+
+    return data if isinstance(data, dict) else {}
+
+
+def write_observed_event_graph(graph: dict[str, Any]) -> None:
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    OBSERVED_EVENT_GRAPH_PATH.write_text(
+        json.dumps(graph, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def load_official_cards_index() -> dict[str, dict[str, Any]]:
+    global _OFFICIAL_CARDS_INDEX
+
+    if _OFFICIAL_CARDS_INDEX is not None:
+        return _OFFICIAL_CARDS_INDEX
+
+    if not OFFICIAL_CARDS_PATH.exists():
+        _OFFICIAL_CARDS_INDEX = {}
+        return _OFFICIAL_CARDS_INDEX
+
+    raw = json.loads(OFFICIAL_CARDS_PATH.read_text(encoding="utf-8-sig"))
+
+    version_data = raw.get("2.0.0") if isinstance(raw, dict) else None
+    if not isinstance(version_data, list):
+        _OFFICIAL_CARDS_INDEX = {}
+        return _OFFICIAL_CARDS_INDEX
+
+    result: dict[str, dict[str, Any]] = {}
+
+    for card in version_data:
+        if not isinstance(card, dict):
+            continue
+
+        card_id = card.get("Id")
+        if card_id:
+            result[str(card_id).lower()] = card
+
+    _OFFICIAL_CARDS_INDEX = result
+    return _OFFICIAL_CARDS_INDEX
+
+
+def official_card_title(card: dict[str, Any]) -> str:
+    localization = card.get("Localization", {})
+    title = localization.get("Title", {}) if isinstance(localization, dict) else {}
+
+    if isinstance(title, dict) and title.get("Text"):
+        return str(title["Text"])
+
+    return str(card.get("InternalName") or "")
+
+
+def official_card_description(card: dict[str, Any]) -> str:
+    localization = card.get("Localization", {})
+    description = localization.get("Description", {}) if isinstance(localization, dict) else {}
+
+    if isinstance(description, dict) and description.get("Text"):
+        return str(description["Text"])
+
+    return str(card.get("InternalDescription") or "")
+
+
+def extract_resource_rewards_from_card(card: dict[str, Any]) -> dict[str, Any]:
+    rewards: dict[str, Any] = {}
+
+    abilities = card.get("Abilities", {})
+    if not isinstance(abilities, dict):
+        return rewards
+
+    for ability in abilities.values():
+        if not isinstance(ability, dict):
+            continue
+
+        action = ability.get("Action", {})
+        if not isinstance(action, dict):
+            continue
+
+        if action.get("$type") != "TActionPlayerModifyAttribute":
+            continue
+
+        attribute = str(action.get("AttributeType") or "").lower()
+
+        value_obj = action.get("Value", {})
+        value = value_obj.get("Value") if isinstance(value_obj, dict) else None
+
+        if value is None:
+            continue
+
+        if attribute == "gold":
+            rewards["gold"] = value
+        elif attribute == "health":
+            rewards["health"] = value
+        elif attribute == "healthmax":
+            rewards["max_health"] = value
+        elif attribute == "income":
+            rewards["income"] = value
+        elif attribute == "experience":
+            rewards["exp"] = value
+        elif attribute == "healthregen":
+            rewards["healthregen"] = value
+        else:
+            rewards[attribute] = value
+
+    return rewards
+
+
+def enrich_child_from_official_cards(
+    child_item: dict[str, Any],
+    official_cards: dict[str, dict[str, Any]],
+) -> None:
+    source_id = str(child_item.get("source_id") or "").lower()
+    if not source_id:
+        return
+
+    card = official_cards.get(source_id)
+    if not card:
+        child_item["name"] = child_item.get("name") or f"未知子选项 {source_id[:8]}"
+        child_item["unresolved"] = True
+        child_item["notes"] = "未能在官方 cards.json 中按 source_id 找到该子选项。"
+        return
+
+    child_item["name"] = official_card_title(card)
+    child_item["internal_name"] = card.get("InternalName", "")
+    child_item["description"] = official_card_description(card)
+    child_item["official_type"] = card.get("$type", "")
+    child_item["heroes"] = card.get("Heroes", [])
+    child_item["tags"] = card.get("Tags", [])
+    child_item["hidden_tags"] = card.get("HiddenTags", [])
+
+    resource_rewards = extract_resource_rewards_from_card(card)
+    if resource_rewards:
+        child_item["resource_rewards"] = resource_rewards
+
+
+def detailed_option_kind(option: dict[str, Any]) -> str:
+    option_id = str(option.get("id") or "")
+    kind = str(option.get("kind") or "").lower()
+    card_type = str(option.get("card_type") or "").lower()
+
+    if option_id.startswith("ste_") or "encounterstep" in card_type:
+        return "step"
+
+    if option_id.startswith("com_") or "combat" in card_type:
+        return "combat"
+
+    if option_id.startswith("pvp_"):
+        return "pvp"
+
+    if option_id.startswith("enc_") or "eventencounter" in card_type:
+        return "encounter"
+
+    return kind or "unknown"
+
+
+def event_name_from_source_id(data: dict[str, Any], source_id: str) -> str | None:
+    source_id_lower = source_id.lower()
+
+    for event_name, event_data in data.get("events", {}).items():
+        if not isinstance(event_data, dict):
+            continue
+
+        for candidate in event_data.get("source_ids", []) or []:
+            if str(candidate).lower() == source_id_lower:
+                return event_name
+
+    return None
+
+
+def auto_observe_event_graph(data: dict[str, Any], payload: dict[str, Any]) -> None:
+    detailed_options = payload.get("event_options_detailed", [])
+    if not isinstance(detailed_options, list):
+        return
+
+    normalized_options: list[dict[str, Any]] = []
+
+    for option in detailed_options:
+        if not isinstance(option, dict):
+            continue
+
+        item = dict(option)
+        item["kind"] = detailed_option_kind(item)
+
+        template_id = str(item.get("template_id") or "")
+        if template_id:
+            item["event_name"] = event_name_from_source_id(data, template_id)
+
+        normalized_options.append(item)
+
+    parents = [
+        option
+        for option in normalized_options
+        if option.get("kind") == "encounter"
+    ]
+
+    children = [
+        option
+        for option in normalized_options
+        if option.get("kind") in {"step", "combat", "pvp"}
+    ]
+
+    # 只在“一个父事件 + 至少一个子选项”的界面记录
+    if len(parents) != 1 or not children:
+        return
+
+    parent = parents[0]
+    parent_name = parent.get("event_name")
+
+    if not parent_name:
+        return
+
+    official_cards = load_official_cards_index()
+    graph = load_observed_event_graph()
+
+    parent_record = graph.get(parent_name, {})
+    if not isinstance(parent_record, dict):
+        parent_record = {}
+
+    parent_record.setdefault("parent_event", parent_name)
+    parent_record.setdefault("parent_source_ids", [])
+    parent_record.setdefault("children", [])
+    parent_record["observed_count"] = int(parent_record.get("observed_count", 0)) + 1
+
+    parent_template_id = parent.get("template_id")
+    if parent_template_id and parent_template_id not in parent_record["parent_source_ids"]:
+        parent_record["parent_source_ids"].append(parent_template_id)
+
+    # 用 source_id 做唯一键：见过的子选项不重复添加，新子选项自动加入
+    existing_children = {
+        child.get("source_id"): child
+        for child in parent_record["children"]
+        if isinstance(child, dict)
+    }
+
+    changed = False
+
+    for child in children:
+        source_id = child.get("template_id")
+        if not source_id:
+            continue
+
+        child_item = existing_children.get(source_id)
+
+        if not child_item:
+            child_item = {
+                "name": child.get("event_name") or child.get("name") or "",
+                "source_id": source_id,
+                "kind": child.get("kind"),
+                "card_type": child.get("card_type"),
+                "seen": True,
+            }
+
+            parent_record["children"].append(child_item)
+            existing_children[source_id] = child_item
+            changed = True
+
+        # 旧子选项也会补充官方 cards.json 信息，但不会被删除或覆盖成空
+        before = json.dumps(child_item, ensure_ascii=False, sort_keys=True)
+
+        enrich_child_from_official_cards(child_item, official_cards)
+
+        after = json.dumps(child_item, ensure_ascii=False, sort_keys=True)
+        if before != after:
+            changed = True
+
+    graph[parent_name] = parent_record
+
+    # 这里每次父事件展开都写入，方便 observed_count 更新；
+    # 但 children 是并集，不会因为本次没出现某个子选项就删除它。
+    write_observed_event_graph(graph)
 
 
 def normalize_card_entries(data: dict[str, Any], entries: Any) -> Any:
@@ -726,6 +1015,8 @@ def analyze_payload(
     include_ai: bool = False,
     top: int | None = None,
 ) -> dict[str, Any]:
+    auto_observe_event_graph(data, payload)
+
     normalized = normalize_payload_for_analysis(data, payload, build_override)
     state = GameState.from_dict(normalized)
     missing_events = [
