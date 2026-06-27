@@ -505,9 +505,6 @@ def analyze_event(
     core_ratio = core_count / total_pool_count if total_pool_count else 0.0
     high_tier_ratio = high_tier_count / total_pool_count if total_pool_count else 0.0
 
-    card_reward = event_data.get("card_reward", {})
-    reward_count = int(card_reward.get("count", 1)) if isinstance(card_reward, dict) else 1
-
     draw_count = get_event_draw_count(event_data)
 
     expected_sell_gold = expected_unrelated_sell_gold(
@@ -562,28 +559,14 @@ def analyze_event(
                     include_followups=False,
                 )
             )
+
         recommendation, reasons, followup_value_summary = apply_followup_value(
             recommendation,
             reasons,
             followup_results,
         )
-        direct_is_empty = (
-            not total_pool_count
-            and not has_resource_reward
-            and not owned_target_hits
-            and not upgrade_hits
-            and high_tier_count == 0
-        )
-        if followup_value_summary and direct_is_empty:
-            followup_pool_stats = followup_value_summary.get("pool_stats", {})
-            if isinstance(followup_pool_stats, dict):
-                pool_stats = dict(followup_pool_stats)
 
-            followup_resource_rewards = followup_value_summary.get("resource_rewards", {})
-            if isinstance(followup_resource_rewards, dict) and followup_resource_rewards:
-                resource_rewards = dict(followup_resource_rewards)
-                has_resource_reward = True
-
+        if followup_value_summary:
             reasons = [
                 reason
                 for reason in reasons

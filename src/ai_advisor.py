@@ -98,11 +98,32 @@ def compact_recommendations(
         "阵容摘要": build_data.get("build_summary", ""),
         "实战Tips": build_data.get("pilot_tips", []),
         "已拥有卡牌": owned_cards,
+        "后续选择规则": "如果某个事件有后续选项，表示选择父事件后只能从后续子事件中选择一个；不能把多个子事件收益相加，也不能把子事件收益当作父事件直接收益。",
         "选项": [],
     }
 
     for result in results:
         pool_stats = result.get("pool_stats", {})
+        if not isinstance(pool_stats, dict):
+            pool_stats = {}
+
+        followup_summary = result.get("followup_value_summary") or {}
+        if not isinstance(followup_summary, dict):
+            followup_summary = {}
+
+        followup_stats = followup_summary.get("pool_stats") or {}
+        if not isinstance(followup_stats, dict):
+            followup_stats = {}
+
+        followup_resource_rewards = followup_summary.get("resource_rewards") or {}
+        if not isinstance(followup_resource_rewards, dict):
+            followup_resource_rewards = {}
+
+        best_followup_name = (
+            result.get("best_followup")
+            or followup_summary.get("best_followup")
+        )
+
         payload["选项"].append(
             {
                 "事件名": _zh_name(data, result.get("event_name")),
@@ -126,7 +147,31 @@ def compact_recommendations(
                     }
                     for card in result.get("owned_target_hits", [])[:5]
                 ],
-                "资源收益": format_resource_rewards(result.get("resource_rewards", {})),
+                "父事件直接资源收益": format_resource_rewards(
+                    result.get("resource_rewards", {})
+                ),
+                "最佳后续": _zh_name(data, best_followup_name),
+                "最佳后续收益": {
+                    "推荐等级": RECOMMENDATION_LABELS_ZH.get(
+                        followup_summary.get("followup_recommendation_level"),
+                        followup_summary.get("followup_recommendation_level"),
+                    ),
+                    "资源收益": format_resource_rewards(followup_resource_rewards),
+                    "候选卡数量": int(followup_stats.get("total_pool_count") or 0),
+                    "构筑相关卡数量": int(followup_stats.get("valuable_count") or 0),
+                    "预期命中数量": _round_ratio(
+                        followup_stats.get("expected_valuable_in_shop") or 0.0
+                    ),
+                    "命中相关卡概率": _round_ratio(
+                        followup_stats.get("prob_valuable_in_shop") or 0.0
+                    ),
+                    "命中核心卡概率": _round_ratio(
+                        followup_stats.get("prob_core_in_shop") or 0.0
+                    ),
+                    "预期卖价金币": _round_ratio(
+                        followup_stats.get("expected_sell_gold") or 0.0
+                    ),
+                },
                 "后续选项": [
                     {
                         "名称": _zh_name(data, option.get("name")),
@@ -152,17 +197,21 @@ def compact_recommendations(
                     }
                     for option in result.get("followup_options", [])[:6]
                 ],
-                "统计": {
-                    "候选卡数量": int(pool_stats.get("total_pool_count", 0)),
-                    "构筑相关卡数量": int(pool_stats.get("valuable_count", 0)),
+                "父事件直接统计": {
+                    "候选卡数量": int(pool_stats.get("total_pool_count") or 0),
+                    "构筑相关卡数量": int(pool_stats.get("valuable_count") or 0),
                     "预期命中数量": _round_ratio(
-                        pool_stats.get("expected_valuable_in_shop", 0.0)
+                        pool_stats.get("expected_valuable_in_shop") or 0.0
                     ),
                     "命中相关卡概率": _round_ratio(
-                        pool_stats.get("prob_valuable_in_shop", 0.0)
+                        pool_stats.get("prob_valuable_in_shop") or 0.0
                     ),
-                    "命中核心卡概率": _round_ratio(pool_stats.get("prob_core_in_shop", 0.0)),
-                    "预期卖价金币": _round_ratio(pool_stats.get("expected_sell_gold", 0.0)),
+                    "命中核心卡概率": _round_ratio(
+                        pool_stats.get("prob_core_in_shop") or 0.0
+                    ),
+                    "预期卖价金币": _round_ratio(
+                        pool_stats.get("expected_sell_gold") or 0.0
+                    ),
                 },
             }
         )
@@ -185,7 +234,9 @@ def build_ai_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
             "role": "system",
             "content": (
                 "你是《The Bazaar》的事件选择建议助手。\n"
-                "你只能基于用户提供的数据判断，不得编造卡牌、事件、概率、规则或额外操作。\n"
+                "你只能基于用户提供的数据判断，不得编造卡牌、事件、概率或规则。\n"
+                "如果数据里有“最佳后续收益”，表示选择父事件后只能再从后续子事件里选一个；"
+                "不要把多个子事件收益相加，也不要把子事件收益当作父事件直接收益。\n"
                 "\n"
                 "最高优先级约束：\n"
                 "1. 当前回合必须从候选事件中选择一个，不能跳过事件。\n"

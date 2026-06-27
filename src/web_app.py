@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import json
@@ -1003,7 +1003,23 @@ def summarize_recommendation(data: dict[str, Any], result: dict[str, Any]) -> di
     recommendation_label_zh = recommendation_label(recommendation)
     event_rule_status = "normal"
 
-    base_reasons = [zh_text(data, reason) for reason in result.get("reasons", [])[:4]]
+    base_reasons = [
+        zh_text(data, reason)
+        for reason in result.get("reasons", [])[:4]
+    ]
+
+    # 父事件已经有运行时观察到的子选项时，过滤掉“无直接收益”的旧提示。
+    if is_parent_event:
+        blocked_reason_parts = [
+            "暂未识别到明确的卡牌或资源收益",
+            "当前缺少可计算收益规则",
+            "暂时无法计算实际收益",
+        ]
+        base_reasons = [
+            reason
+            for reason in base_reasons
+            if not any(part in reason for part in blocked_reason_parts)
+        ]
 
     if not known:
         event_rule_status = "missing_event"
@@ -1015,8 +1031,12 @@ def summarize_recommendation(data: dict[str, Any], result: dict[str, Any]) -> di
         )
     elif is_parent_event:
         event_rule_status = "parent_event"
-        recommendation = "Medium Value"
-        recommendation_label_zh = "父事件"
+
+        # 不再强制把父事件改成 Medium Value。
+        # 推荐等级保留 recommender.py 的结果，因为它可能已经根据最佳后续提升过。
+        recommendation = result.get("recommendation")
+        recommendation_label_zh = recommendation_label(recommendation)
+
         base_reasons.insert(
             0,
             parent_event_reason_text(child_options),
@@ -1037,6 +1057,19 @@ def summarize_recommendation(data: dict[str, Any], result: dict[str, Any]) -> di
         )
 
     pool_stats = result.get("pool_stats", {})
+    followup_summary = result.get("followup_value_summary") or {}
+    if not isinstance(followup_summary, dict):
+        followup_summary = {}
+
+    followup_stats = followup_summary.get("pool_stats") or {}
+    if not isinstance(followup_stats, dict):
+        followup_stats = {}
+
+    followup_resource_rewards = followup_summary.get("resource_rewards") or {}
+    if not isinstance(followup_resource_rewards, dict):
+        followup_resource_rewards = {}
+
+    best_followup = result.get("best_followup") or followup_summary.get("best_followup")
 
     return {
         "event_name": event_name,
@@ -1067,6 +1100,34 @@ def summarize_recommendation(data: dict[str, Any], result: dict[str, Any]) -> di
         ],
         "resource_rewards": result.get("resource_rewards", {}),
         "child_options": child_options,
+        "best_followup": best_followup,
+        "best_followup_display": zh_name(data, best_followup),
+        "best_followup_summary": {
+            "recommendation": followup_summary.get("followup_recommendation_level"),
+            "recommendation_label": recommendation_label(
+                followup_summary.get("followup_recommendation_level")
+            ),
+            "resource_rewards": followup_resource_rewards,
+            "resource_reward_text": format_resource_rewards(followup_resource_rewards),
+            "candidate_cards": int(followup_stats.get("total_pool_count") or 0),
+            "build_relevant_cards": int(followup_stats.get("valuable_count") or 0),
+            "expected_relevant": round(
+                float(followup_stats.get("expected_valuable_in_shop") or 0.0),
+                2,
+            ),
+            "prob_relevant": round(
+                float(followup_stats.get("prob_valuable_in_shop") or 0.0),
+                4,
+            ),
+            "prob_core": round(
+                float(followup_stats.get("prob_core_in_shop") or 0.0),
+                4,
+            ),
+            "expected_sell_gold": round(
+                float(followup_stats.get("expected_sell_gold") or 0.0),
+                2,
+            ),
+        },
         "parent_event_observed_count": int(parent_graph.get("observed_count", 0)) if isinstance(parent_graph, dict) else 0,
         "pool_stats": {
             "candidate_cards": int(pool_stats.get("total_pool_count", 0)),
