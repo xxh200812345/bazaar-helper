@@ -1,5 +1,19 @@
 # PROJECT_CONTEXT_FOR_CHATGPT
 
+## 0. 当前版本快照（2026-06-28）
+
+当前稳定版本重点：
+
+* AI 分析层已从“长提示词兜底”改为“短提示词 + 结构化 payload”。
+* 当前金币已传入 AI 分析，AI 可以解释商店购买力和“刷到但买不起”的风险。
+* `src/ai_advisor.py` 负责生成金币状态、购买力判断、精简后的事件 payload 和短 system prompt。
+* `src/web_app.py` 在调用 AI 前，会把 UI 展示层修正后的 `recommendation` / `reasons` 合并回 AI 输入，保证顶部 AI 总结和事件卡片一致。
+* AI 仍不能假设未提供的信息，包括血量压力、棋盘强度、格子空间、敌人强度、必须保命或必须转型。
+* 父子事件仍必须区分“父事件直接收益”和“最佳后续收益”，不能把多个子事件收益相加。
+* 技能收益事件仍最低按 `Medium Value / 可以考虑` 处理，AI 和 UI 都要同步该推荐等级。
+
+---
+
 ## 1. 项目一句话
 
 这是一个本地运行的《The Bazaar》AI 决策助手项目：通过 BepInEx 插件导出结构化游戏状态，Python Web UI 读取状态并展示事件推荐，规则系统先计算事件/商店收益，DeepSeek 只负责把结构化结果解释成中文短建议。
@@ -11,6 +25,8 @@
 * `data/events.json` 是基础事件库；人工修正和新增优先写 `data/event_overrides.json`。
 * 尽量做最小改动，不要随便重构架构。
 * 推荐等级、父子事件收益、技能收益兜底都应优先在规则层和展示层明确计算，AI 只负责解释。
+* 当前金币可以参与 AI 解释商店购买力；没有结构化字段支撑的信息不能让 AI 自行推断。
+* AI prompt 应保持短而硬，具体事实尽量通过 payload 字段传入，而不是塞进超长提示词。
 
 ---
 
@@ -715,24 +731,114 @@ unknown_event 示例：
 
 `src/ai_advisor.py` 负责：
 
-* 把推荐器结果压缩成中文结构化 payload。
+* 把推荐器 / 展示层结果压缩成中文结构化 payload。
+* 加入当前金币、金币状态和购买力判断。
 * 调 DeepSeek。
 * 清理 Markdown 符号。
-* 输出短建议。
+* 输出中文短建议。
 
-当前要求：
+当前原则：
 
-* 必须中文。
-* 不输出 Markdown。
-* 总字数控制短。
-* 只能基于输入数据判断。
-* 不得编造卡牌、事件、概率或规则。
-* 必须严格遵守推荐等级排序。
-* 不能在存在“可以考虑”或“优先选择”的事件时，推荐“优先级低”的事件。
-* 不能把多个子事件收益相加。
-* 不能把子事件收益当作父事件直接收益。
+* AI 只解释结构化结果，不重新发明游戏规则。
+* AI 不得编造卡牌、事件、概率、机制或候选之外的操作。
+* AI 必须严格遵守推荐等级排序。
+* AI 必须从本轮候选事件中选一个，不能跳过事件。
+* AI 可以使用当前金币解释商店购买力。
+* AI 不能假设未提供的信息：血量压力、棋盘强度、格子空间、敌人强度、必须保命、必须转型。
+* AI 输出尽量短，不使用 Markdown、表格、代码块或多层列表。
 
-推荐排序规则：
+### 当前 AI payload
+
+`compact_recommendations()` 应接收：
+
+```python
+compact_recommendations(
+    data=data,
+    hero=state.hero,
+    build_name=state.build,
+    current_day=state.day,
+    owned_cards=state.owned_cards,
+    results=ai_results,
+    current_gold=state.gold,
+)
+```
+
+全局字段应包含：
+
+```text
+英雄
+阵容
+天数
+当前金币
+金币状态
+阶段
+阵容时机
+阵容摘要
+实战Tips
+已拥有卡牌
+后续选择规则
+选项
+```
+
+每个事件选项应尽量包含：
+
+```text
+事件名
+推荐等级
+事件类型
+购买力判断
+原因
+关键卡
+已拥有命中
+父事件直接资源收益
+父事件直接统计
+最佳后续
+最佳后续收益
+后续选项
+```
+
+### 金币 / 购买力分析
+
+当前金币只用于解释“商店收益能否兑现”，不等于完整局势判断。
+
+建议分档：
+
+```text
+<= 5   极低
+<= 12  偏低
+<= 25  正常
+> 25   充足
+未知   未知
+```
+
+购买力解释规则：
+
+```text
+金币极低：
+    商店存在刷到目标物品但买不起的风险。
+    免费奖励、固定奖励或金币事件相对更稳。
+
+金币偏低：
+    商店事件需要考虑购买力风险。
+    小卡池、高命中商店优先于大卡池商店。
+
+金币正常：
+    可以正常比较商店卡池质量。
+
+金币充足：
+    高质量商店、技能商店和转型商店更容易兑现收益。
+```
+
+注意：
+
+* 不能因为金币高就推荐低质量商店。
+* 不能因为金币低就完全否定高质量商店，只能提示兑现风险。
+* 资源事件给金币时，应结合当前金币状态解释边际价值。
+* 没有当前棋盘、已有格子和战力强度时，不能判断“买了能不能放”“是否必须卖牌”“是否必须保命”。
+
+### 推荐排序规则
+
+推荐排序：
 
 ```text
 优先选择 > 可以考虑 > 优先级低
@@ -747,12 +853,14 @@ AI 输出时：
 禁止因为文字描述看起来不错，就推荐等级更低的事件。
 ```
 
-父子事件规则：
+### 父子事件规则
 
 ```text
 如果事件有后续选项，表示选择父事件后只能再从后续子事件里选一个。
 不要把多个子事件收益相加。
 不要把子事件收益当作父事件直接收益。
+父事件直接资源收益 / 父事件直接统计只表示父事件自己的收益。
+最佳后续 / 最佳后续收益只作为后续选择价值解释。
 ```
 
 AI payload 应明确区分：
@@ -765,7 +873,41 @@ AI payload 应明确区分：
 后续选项
 ```
 
-API Key 支持：
+### 短提示词原则
+
+当前推荐：
+
+```text
+短 system prompt + 强结构化 payload + 固定输出格式
+```
+
+不推荐：
+
+```text
+超长 system prompt + 让 AI 自己理解所有游戏规则
+```
+
+`build_ai_messages()` 的 system prompt 只保留硬规则：
+
+```text
+1. 只解释结构化结果，不能编造。
+2. 必须从候选事件中选一个，不能跳过。
+3. 严格遵守推荐等级。
+4. 可以使用当前金币解释购买力。
+5. 父子事件不能相加。
+6. 不假设未提供的局势信息。
+7. 中文短输出，不用 Markdown。
+```
+
+推荐输出格式：
+
+```text
+推荐：候选事件名之一
+核心判断：结合推荐等级、卡池/资源/技能/后续收益和金币购买力说明主要价值
+对比理由：说明为什么比其他候选更好，并简要说明不确定项
+```
+
+### API Key 支持
 
 ```text
 环境变量 DEEPSEEK_API_KEY
@@ -774,7 +916,6 @@ runtime/deepseek_api_key.txt
 
 `runtime/deepseek_api_key.txt` 不应提交 Git。
 
----
 
 ## 12. 当前已知代码维护点
 
@@ -1025,7 +1166,7 @@ bepinex/**/obj/
 ```powershell
 git status
 git add src\recommender.py src\web_app.py src\ai_advisor.py PROJECT_CONTEXT_FOR_CHATGPT.md
-git commit -m "fix followup and skill event recommendations"
+git commit -m "improve AI event analysis with gold affordability"
 ```
 
 ---
@@ -1067,6 +1208,8 @@ src/recommender.py
 
 ```text
 web_app.py -> analyze_payload()
+是否把 state.gold 作为 current_gold 传给 compact_recommendations()
+是否把 response["recommendations"] 的 recommendation / reasons 合并回 ai_results
 ai_advisor.py -> compact_recommendations()
 ai_advisor.py -> build_ai_messages()
 ```
@@ -1138,6 +1281,7 @@ runtime/game_state.json
 如果涉及父子事件，注意子事件收益不能合并进父事件直接收益。
 如果涉及技能事件，所有技能收益事件最低按“可以考虑”处理。
 如果 UI 卡片和 AI 总结不一致，优先检查 web_app.py 是否把展示层修正后的推荐传给 ai_advisor.py。
+如果 AI 没有分析金币/商店购买力，优先检查 web_app.py 是否把 state.gold 传给 compact_recommendations()，以及 ai_advisor.py 是否把 current_gold 写入 payload。
 ```
 
 ---
@@ -1152,7 +1296,7 @@ runtime/game_state.json
 5. 保证 event_overrides.json 可以稳定修正事件
 6. 保证父子事件收益不合并，后续收益单独展示
 7. 保证技能收益事件最低显示为可以考虑
-8. 优化 AI 输出，并保证 AI 推荐等级与 UI 卡片一致
+8. 保持 AI 输出短而稳，并保证 AI 推荐等级与 UI 卡片一致
 9. 继续补事件数据
 10. 扩展更多英雄和阵容
 ```
@@ -1186,6 +1330,7 @@ AI 必须遵守推荐等级排序。
 存在“可以考虑”时，不能推荐“优先级低”。
 存在“优先选择”时，优先从“优先选择”中推荐。
 AI 不能自己重新发明规则，只能解释结构化结果。
+AI 可以解释当前金币和商店购买力，但不能假设血量压力、棋盘强度、格子空间或敌人强度。
 ```
 
 ### 数据修正

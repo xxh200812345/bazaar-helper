@@ -1295,6 +1295,7 @@ def analyze_payload(
             current_day=state.day,
             owned_cards=state.owned_cards,
             results=ai_results,
+            current_gold=state.gold,
         )
         try:
             response["ai_analysis"] = analyze_with_ai(ai_payload)

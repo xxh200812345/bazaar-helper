@@ -78,6 +78,90 @@ def _priority_cards(
     ]
 
 
+def _gold_status(current_gold: Any) -> str:
+    if current_gold in (None, ""):
+        return "未知"
+    try:
+        gold = int(current_gold)
+    except (TypeError, ValueError):
+        return "未知"
+
+    if gold <= 5:
+        return "极低"
+    if gold <= 12:
+        return "偏低"
+    if gold <= 25:
+        return "正常"
+    return "充足"
+
+
+def _is_shop_event(event_data: dict[str, Any]) -> bool:
+    event_category = str(event_data.get("event_category") or "").lower()
+    event_type = str(event_data.get("event_type") or "").lower()
+    return (
+        event_category in {"shops", "skill_shops"}
+        or event_type in {"shop", "item_shop", "skill_shop", "shop_event"}
+        or "shop" in event_type
+    )
+
+
+def _affordability_summary(
+    *,
+    current_gold: Any,
+    event_data: dict[str, Any],
+    resource_rewards: dict[str, Any],
+) -> dict[str, Any]:
+    status = _gold_status(current_gold)
+    is_shop = _is_shop_event(event_data)
+
+    try:
+        gained_gold = int(resource_rewards.get("gold") or 0)
+    except (TypeError, ValueError):
+        gained_gold = 0
+
+    notes: list[str] = []
+    risk = "未知" if status == "未知" else "无"
+
+    if is_shop:
+        if status == "极低":
+            risk = "高"
+            notes.append("当前金币极低，商店存在刷到目标物品但买不起的风险。")
+            notes.append("免费奖励、固定奖励或金币事件的相对稳定性更高。")
+        elif status == "偏低":
+            risk = "中"
+            notes.append("当前金币偏低，商店事件需要考虑购买力风险。")
+            notes.append("小卡池、高命中商店优先于大卡池商店。")
+        elif status == "正常":
+            risk = "低"
+            notes.append("当前金币正常，可以正常比较商店卡池质量。")
+        elif status == "充足":
+            risk = "低"
+            notes.append("当前金币充足，高质量商店和转型商店更容易兑现收益。")
+        else:
+            notes.append("当前金币未知，无法判断商店奖励是否买得起。")
+    else:
+        if status == "未知":
+            notes.append("当前金币未知，但该事件不是纯商店事件，购买力限制较弱。")
+        else:
+            notes.append("该事件不是纯商店事件，当前金币不会明显限制奖励获取。")
+
+    if gained_gold > 0:
+        if status in {"极低", "偏低"}:
+            notes.append(f"该事件提供 {gained_gold} 金币，当前金币偏低时价值提高。")
+        elif status in {"正常", "充足"}:
+            notes.append(f"该事件提供 {gained_gold} 金币，但当前金币不低，边际价值相对下降。")
+        else:
+            notes.append(f"该事件提供 {gained_gold} 金币。")
+
+    return {
+        "当前金币": current_gold,
+        "金币状态": status,
+        "购买力风险": risk,
+        "是否商店事件": is_shop,
+        "说明": notes[:3],
+    }
+
+
 def compact_recommendations(
     *,
     data: dict[str, Any],
@@ -86,6 +170,7 @@ def compact_recommendations(
     current_day: int,
     owned_cards: dict[str, str],
     results: list[dict[str, Any]],
+    current_gold: int | None = None,
 ) -> dict[str, Any]:
     build_data = data["builds"][build_name]
 
@@ -93,6 +178,8 @@ def compact_recommendations(
         "英雄": hero,
         "阵容": build_name,
         "天数": current_day,
+        "当前金币": current_gold,
+        "金币状态": _gold_status(current_gold),
         "阶段": STAGE_LABELS_ZH.get(get_game_stage_for_day(current_day), get_game_stage_for_day(current_day)),
         "阵容时机": format_build_timing_summary(build_data, current_day),
         "阵容摘要": build_data.get("build_summary", ""),
@@ -103,6 +190,15 @@ def compact_recommendations(
     }
 
     for result in results:
+        event_name = result.get("event_name")
+        event_data = data.get("events", {}).get(event_name, {})
+        if not isinstance(event_data, dict):
+            event_data = {}
+
+        resource_rewards = result.get("resource_rewards", {})
+        if not isinstance(resource_rewards, dict):
+            resource_rewards = {}
+
         pool_stats = result.get("pool_stats", {})
         if not isinstance(pool_stats, dict):
             pool_stats = {}
@@ -126,10 +222,16 @@ def compact_recommendations(
 
         payload["选项"].append(
             {
-                "事件名": _zh_name(data, result.get("event_name")),
+                "事件名": _zh_name(data, event_name),
                 "推荐等级": RECOMMENDATION_LABELS_ZH.get(
                     result.get("recommendation"),
                     result.get("recommendation"),
+                ),
+                "事件类型": event_data.get("event_type") or event_data.get("event_category") or "",
+                "购买力判断": _affordability_summary(
+                    current_gold=current_gold,
+                    event_data=event_data,
+                    resource_rewards=resource_rewards,
                 ),
                 "说明": "",
                 "原因": [
@@ -147,9 +249,7 @@ def compact_recommendations(
                     }
                     for card in result.get("owned_target_hits", [])[:5]
                 ],
-                "父事件直接资源收益": format_resource_rewards(
-                    result.get("resource_rewards", {})
-                ),
+                "父事件直接资源收益": format_resource_rewards(resource_rewards),
                 "最佳后续": _zh_name(data, best_followup_name),
                 "最佳后续收益": {
                     "推荐等级": RECOMMENDATION_LABELS_ZH.get(
@@ -233,42 +333,25 @@ def build_ai_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
         {
             "role": "system",
             "content": (
-                "你是《The Bazaar》的事件选择建议助手。\n"
-                "你只能基于用户提供的数据判断，不得编造卡牌、事件、概率或规则。\n"
-                "如果数据里有“最佳后续收益”，表示选择父事件后只能再从后续子事件里选一个；"
-                "不要把多个子事件收益相加，也不要把子事件收益当作父事件直接收益。\n"
-                "\n"
-                "最高优先级约束：\n"
-                "1. 当前回合必须从候选事件中选择一个，不能跳过事件。\n"
-                "2. 只要候选事件不为空，推荐行必须填写候选事件名之一，禁止写“无”“跳过”“不选”“放弃”。\n"
-                "5. 如果所有候选事件都很差，也必须选择相对最不差的一个，并说明“都不理想，但该选项损失最小”。\n"
-                "6. 禁止建议候选之外的行为，例如跳过事件、找商店、完成任务、升级武器、等下一回合。\n"
-                "7. 阵容摘要和实战Tips只能作为背景，不能生成本轮候选之外的操作建议。\n"
-                "\n"
-                "选择优先级：\n"
-                "1. 优先选择推荐等级更高的事件。\n"
-                "2. 同等级时，优先选择构筑相关卡、核心卡概率、资源收益、已有物品命中或后续选项更好的事件。\n"
-                "3. 如果全部没有明显收益，选择资源收益最高或损失最小的事件。\n"
-                "\n"
-                "输出规则：\n"
-                "1. 必须使用中文。\n"
-                "2. 禁止使用 Markdown。\n"
-                "3. 禁止使用 **、#、表格、代码块。\n"
-                "4. 禁止使用多层列表。\n"
-                "5. 不要写成长篇攻略，但要解释清楚推荐逻辑。\n"
-                "6. 总字数控制在 280 到 420 字之间。\n"
-                "\n"
-                "先包含下面 3 行输出，再增加其他内容：\n"
+                "你是《The Bazaar》的事件选择建议助手。规则系统已经完成事实计算，你只负责解释结构化结果。\n"
+                "禁止编造卡牌、事件、概率、机制或候选之外的操作。\n"
+                "必须从候选事件名中选一个，不能跳过、放弃或建议等下一回合。\n"
+                "必须严格遵守推荐等级：优先选择 > 可以考虑 > 优先级低。有更高等级候选时，不要推荐低等级候选。\n"
+                "可以使用当前金币和购买力判断解释商店风险：金币低时，商店有刷到但买不起的风险；免费奖励、固定奖励、金币事件相对更稳。\n"
+                "父子事件只能按最佳后续解释，不能把多个子事件收益相加，也不能把子事件收益当作父事件直接收益。\n"
+                "不要假设未提供的信息，包括血量压力、棋盘强度、已有格子、敌人强度。\n"
+                "输出中文纯文本，不使用 Markdown、表格、代码块或多层列表，控制在 180 到 320 字。\n"
+                "格式固定为三段：\n"
                 "推荐：候选事件名之一\n"
-                "核心判断：说明推荐事件对当前阵容、阶段、已有卡牌的主要价值\n"
-                "对比理由：说明它为什么比其他候选更好\n"
+                "核心判断：结合推荐等级、卡池/资源/技能/后续收益和金币购买力说明主要价值\n"
+                "对比理由：说明为什么比其他候选更好，并简要说明不确定项\n"
             ),
         },
         {
             "role": "user",
             "content": (
                 f"本轮候选事件名只能从这里选择：{option_name_text}\n"
-                "下面是本次事件候选数据，只能基于这些数据判断：\n"
+                "下面是规则系统计算后的结构化事件候选数据，只能基于这些数据判断：\n"
                 f"{summary_json}"
             ),
         },
