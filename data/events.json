@@ -766,7 +766,7 @@
         "Jules",
         "Stelle"
       ],
-      "shop_type": "small+medium+large",
+      "shop_type": "small+large",
       "hero_filter": null,
       "shop_pool": {
         "reward_tags": [],
@@ -779,7 +779,6 @@
         "hero_scope": "current",
         "size_filter": [
           "small",
-          "medium",
           "large"
         ]
       },
