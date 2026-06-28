@@ -22,8 +22,10 @@ namespace BazaarStateExporter
         private Harmony harmony;
         private float nextPollAt;
         private float nextUiScanAt;
+        private float nextCardExportAt;
         private float inspectAt;
         private bool inspected;
+        private bool runtimeCardsExported;
 
         private void Awake()
         {
@@ -68,6 +70,7 @@ namespace BazaarStateExporter
                 Logger.LogWarning("Failed to apply Harmony patches: " + ex);
             }
             inspectAt = Time.unscaledTime + 8.0f;
+            nextCardExportAt = Time.unscaledTime + 12.0f;
             Logger.LogInfo(PluginName + " loaded. OutputPath=" + outputPath.Value);
         }
 
@@ -120,6 +123,26 @@ namespace BazaarStateExporter
             catch (Exception ex)
             {
                 Logger.LogWarning("Failed to export Bazaar state: " + ex);
+            }
+
+            if (!runtimeCardsExported && Time.unscaledTime >= nextCardExportAt)
+            {
+                nextCardExportAt = Time.unscaledTime + 60.0f;
+                try
+                {
+                    RuntimeCardExportResult result =
+                        RuntimeCardExporter.TryExportLatestCards(outputPath.Value, Logger);
+                    runtimeCardsExported = result != null && result.ExportedCardCount > 0;
+                    if (runtimeCardsExported)
+                    {
+                        Logger.LogInfo(
+                            "Runtime card library exported successfully; no further exports will run this session.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning("Failed to export runtime cards: " + ex);
+                }
             }
         }
     }

@@ -1,42 +1,62 @@
-# Python
+# Python environments and caches
 .venv/
 venv/
 env/
+ENV/
 __pycache__/
 *.py[cod]
-*.pyo
 *.pyd
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# IDE
-.vscode/
-.idea/
+# Node.js and Codex artifact workspaces
+node_modules/
+.codex_spreadsheet_work/
 
-# Local browser / crawler profile
-.edge-bazaardb-profile/
-
-# Runtime / cache / temp
-runtime/
-tmp/
-temp/
-outputs/
-debug_output/
-*.log
-
-# Secrets
-.env
-*.key
-*.secret
-runtime/deepseek_api_key.txt
-
-# C# / BepInEx build artifacts
-bin/
-obj/
-bepinex/**/bin/
-bepinex/**/obj/
+# .NET / BepInEx build artifacts
+[Bb]in/
+[Oo]bj/
 *.dll
 *.pdb
+*.user
+*.suo
+
+# PyInstaller and packaged applications
+/build/
+/dist/
+*.spec
+/*_share/
+
+# Runtime exports, generated output, and temporary files
+/runtime/
+/outputs/
+/debug_output/
+/tmp/
+/temp/
+*.backup.json
+*.tmp
+*.log
+
+# Browser and tool profiles
+.edge-bazaardb-profile/
+
+# IDE and operating-system files
+.vscode/
+.idea/
+.vs/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.secret
 
 # Archives
 *.zip

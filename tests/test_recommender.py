@@ -158,6 +158,55 @@ class RecommenderTests(unittest.TestCase):
         self.assertTrue(cards)
         self.assertTrue(any(card["raw"]["hero"] not in {"Vanessa", "Common"} for card in cards))
 
+    def test_item_and_skill_pools_are_kept_separate(self) -> None:
+        cards = {
+            "Test Item": {
+                "type": "Item",
+                "hero": "Common",
+                "heroes": ["Common"],
+                "size": "Small",
+                "tags": [],
+                "min_rarity": "bronze",
+                "max_rarity": "diamond",
+            },
+            "Test Skill": {
+                "type": "Skill",
+                "hero": "Common",
+                "heroes": ["Common"],
+                "size": "Medium",
+                "tags": [],
+                "min_rarity": "bronze",
+                "max_rarity": "diamond",
+            },
+            "Test Encounter": {
+                "type": "EventEncounter",
+                "hero": "Common",
+                "heroes": ["Common"],
+                "size": "Medium",
+                "tags": [],
+                "min_rarity": "bronze",
+                "max_rarity": "diamond",
+            },
+        }
+
+        item_pool, _ = infer_possible_cards_for_event(
+            event_data={"event_category": "shops", "shop_pool": {}},
+            cards=cards,
+            current_day=5,
+            rarity_rules={},
+            current_hero="Vanessa",
+        )
+        skill_pool, _ = infer_possible_cards_for_event(
+            event_data={"event_category": "skill_shops", "shop_pool": {}},
+            cards=cards,
+            current_day=5,
+            rarity_rules={},
+            current_hero="Vanessa",
+        )
+
+        self.assertEqual([card["name"] for card in item_pool], ["Test Item"])
+        self.assertEqual([card["name"] for card in skill_pool], ["Test Skill"])
+
     def test_game_state_requires_matching_hero(self) -> None:
         data = load_all_data(DATA_DIR)
         state = GameState(

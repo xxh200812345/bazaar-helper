@@ -217,6 +217,7 @@ def infer_possible_cards_for_event(
     )
     hero_scope = normalize_text(pool_rule.get("hero_scope") or "current")
     current_hero = normalize_text(current_hero)
+    expected_card_type = "skill" if event_has_skill_reward(event_data) else "item"
 
     rarity_filter = resolve_event_rarity_filter(pool_rule, current_day, rarity_rules)
     if rarity_filter is None:
@@ -225,6 +226,12 @@ def infer_possible_cards_for_event(
     possible_cards: list[dict[str, Any]] = []
 
     for card_name, card_data in cards.items():
+        card_type = normalize_text(
+            card_data.get("type") or card_data.get("card_type")
+        )
+        if card_type != expected_card_type:
+            continue
+
         card_tags = normalize_text_list(card_data.get("tags", []))
         card_min = normalize_text(card_data.get("min_rarity"))
         card_max = normalize_text(card_data.get("max_rarity"))
