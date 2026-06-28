@@ -916,7 +916,7 @@ def parent_event_reason_text(child_options: list[dict[str, Any]]) -> str:
 
 def tier_label(tier: Any) -> str:
     if tier in (None, "", "Unknown"):
-        return "未评级"
+        return ""
     return str(tier)
 
 
@@ -1719,11 +1719,10 @@ HTML_PAGE = r"""<!doctype html>
       eventsEl.innerHTML = (data.recommendations || []).map((item) => {
         const stats = item.pool_stats || {};
         const cards = (item.priority_cards || []).map((card) =>
-          `<li>${card.display_name || card.name} <span class="muted">${card.tier || ""} ${card.role_label_zh || card.role || ""}</span></li>`
+          `<li>${card.display_name || card.name} <span class="muted">${card.role_label_zh || card.role || ""}</span></li>`
         ).join("");
         const ownedHits = (item.owned_target_hits || []).map((card) =>
-          `<li>${card.display_name || card.name} <span class="muted">${card.tier || ""} ${card.role_label_zh || card.role || ""}${card.can_upgrade ? " · 可升级" : ""}${card.enchantments && card.enchantments.length ? " · " + card.enchantments.join(", ") : ""}</span></li>`
-        ).join("");
+          `<li>${card.display_name || card.name} <span class="muted">${card.role_label_zh || card.role || ""}${card.can_upgrade ? " · 可升级" : ""}${card.enchantments && card.enchantments.length ? " · " + card.enchantments.join(", ") : ""}</span></li>`
         const childOptions = (item.child_options || []).map((child) => {
         const reward = child.reward_text ? ` <span class="muted">${child.reward_text}</span>` : "";
         const desc = child.description && !child.reward_text ? ` <span class="muted">${child.description}</span>` : "";
