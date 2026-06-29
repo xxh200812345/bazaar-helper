@@ -68,5 +68,119 @@
       "health": 0
     },
     "notes": "Choose 1 of 6 Packages."
+  },
+  "Get Silver Loot": {
+    "_override_reason": "人工修正：该事件实际为获得动态金币，并获得 1 个白银品质 Loot 物品；原始结构误把卡池写成了任意白银物品。",
+    "_dynamic_reward": true,
+    "qualitative_rewards": ["gold"],
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": ["loot"],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "silver",
+        "max": "silver"
+      },
+      "rarity_rule": null,
+      "excluded_tags": ["legendary"],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {},
+    "notes": "Get dynamic Gold and a Silver-tier Loot item."
+  },
+  "Cache of Riches": {
+    "_override_reason": "人工修正：金币数值来自 ability.0，当前解析成 1 偏低，先不写固定金币数。",
+    "_dynamic_reward": true,
+    "qualitative_rewards": ["gold"],
+    "resource_rewards": {},
+    "notes": "Gain dynamic Gold. Amount is not parsed yet."
+  },
+  "The Docks": {
+    "_override_reason": "人工修正：码头是父事件，实际进入三个工作子选项；父事件本身不直接给金币。",
+    "event_type": "utility_event",
+    "event_category": "utility_events",
+    "resource_types": [],
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Work at the Docks and choose one job.",
+    "followup_options": [
+      {
+        "name": "Work as Dockhand",
+        "event_heroes": ["Common"],
+        "event_type": "item_reward",
+        "event_category": "item_rewards",
+        "parent_event": "The Docks",
+        "resource_rewards": {
+          "gold": 2,
+          "exp": 0,
+          "health": 0
+        },
+        "card_reward": {
+          "enabled": true,
+          "exact_names": [],
+          "reward_tags": ["tool"],
+          "match_mode": "any",
+          "rarity_filter": null,
+          "rarity_rule": "normal_shop_by_day",
+          "excluded_tags": ["legendary"],
+          "hero_scope": "any",
+          "count": 1
+        },
+        "notes": "Gain 2 Gold and a Tool from any Hero."
+      },
+      {
+        "name": "Work as Maintenance",
+        "event_heroes": ["Common"],
+        "event_type": "item_reward",
+        "event_category": "item_rewards",
+        "parent_event": "The Docks",
+        "resource_rewards": {
+          "gold": 2,
+          "exp": 0,
+          "health": 0
+        },
+        "card_reward": {
+          "enabled": true,
+          "exact_names": [],
+          "reward_tags": ["shield"],
+          "match_mode": "any",
+          "rarity_filter": null,
+          "rarity_rule": "normal_shop_by_day",
+          "excluded_tags": ["legendary"],
+          "hero_scope": "any",
+          "count": 1
+        },
+        "notes": "Gain 2 Gold and a Shield item from any Hero."
+      },
+      {
+        "name": "Work as Security",
+        "event_heroes": ["Common"],
+        "event_type": "item_reward",
+        "event_category": "item_rewards",
+        "parent_event": "The Docks",
+        "resource_rewards": {
+          "gold": 2,
+          "exp": 0,
+          "health": 0
+        },
+        "card_reward": {
+          "enabled": true,
+          "exact_names": [],
+          "reward_tags": ["weapon"],
+          "match_mode": "any",
+          "rarity_filter": null,
+          "rarity_rule": "normal_shop_by_day",
+          "excluded_tags": ["legendary"],
+          "hero_scope": "any",
+          "count": 1
+        },
+        "notes": "Gain 2 Gold and a Weapon from any Hero."
+      }
+    ]
   }
 }

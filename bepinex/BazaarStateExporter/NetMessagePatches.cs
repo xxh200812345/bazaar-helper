@@ -14,6 +14,7 @@ namespace BazaarStateExporter
     {
         public static ManualLogSource Logger;
         public static object LatestGameStateSnapshot;
+        public static object NetMessageProcessor;
         public static int? LatestGold;
         public static int? LatestHealth;
         public static float LastResourceUpdateAt;
@@ -21,6 +22,7 @@ namespace BazaarStateExporter
         private static readonly object ResourcesLock = new object();
         private static readonly object CapturedCardsLock = new object();
         private static readonly Dictionary<string, CapturedCardEntry> CapturedCardsByInstanceId = new Dictionary<string, CapturedCardEntry>();
+        private static List<CardSnapshot> CurrentVisibleCards = new List<CardSnapshot>();
 
         public static void UpdateResources(int? gold, int? health, string source)
         {
@@ -84,6 +86,7 @@ namespace BazaarStateExporter
             lock (CapturedCardsLock)
             {
                 CapturedCardsByInstanceId.Clear();
+                CurrentVisibleCards.Clear();
             }
 
             Logger?.LogInfo("Cleared runtime resource and UI card caches for new run.");
@@ -142,6 +145,24 @@ namespace BazaarStateExporter
             return result;
         }
 
+        public static void SetCurrentVisibleCards(List<CardSnapshot> cards)
+        {
+            lock (CapturedCardsLock)
+            {
+                CurrentVisibleCards = cards == null
+                    ? new List<CardSnapshot>()
+                    : new List<CardSnapshot>(cards);
+            }
+        }
+
+        public static List<CardSnapshot> GetCurrentVisibleCards()
+        {
+            lock (CapturedCardsLock)
+            {
+                return new List<CardSnapshot>(CurrentVisibleCards);
+            }
+        }
+
         private sealed class CapturedCardEntry
         {
             public CardSnapshot Card;
@@ -186,6 +207,7 @@ namespace BazaarStateExporter
             {
                 RuntimeStateCache.LatestGameStateSnapshot = data;
                 RuntimeStateCache.Logger?.LogInfo("Captured NetMessageGameStateSync via Harmony patch.");
+                Plugin.RequestEventExport();
             }
         }
     }
@@ -217,8 +239,9 @@ namespace BazaarStateExporter
                 .ToArray();
         }
 
-        public static void Prefix(object __0)
+        public static void Prefix(object __instance, object __0)
         {
+            RuntimeStateCache.NetMessageProcessor = __instance;
             object message = __0;
             try
             {
@@ -239,6 +262,24 @@ namespace BazaarStateExporter
             {
                 RuntimeStateCache.Logger?.LogDebug("Resource message capture failed: " + ex.Message);
             }
+            Plugin.RequestEventExport();
+        }
+
+        public static void Postfix(object __instance)
+        {
+            RuntimeStateCache.NetMessageProcessor = __instance;
+            if (RuntimeStateCache.LatestGameStateSnapshot == null)
+            {
+                object dto = StateProbe.TryReadLatestGameStateFromProcessor(__instance);
+                if (dto != null)
+                {
+                    RuntimeStateCache.LatestGameStateSnapshot = dto;
+                    RuntimeStateCache.Logger?.LogInfo(
+                        "Recovered initial GameStateSnapshotDTO from current NetMessageProcessor.");
+                }
+            }
+
+            Plugin.RequestEventExport();
         }
     }
 
@@ -554,12 +595,36 @@ namespace BazaarStateExporter
 
     public static class UiCardCapture
     {
+        public static CardSnapshot TryBuildSnapshot(object controller, string source)
+        {
+            try
+            {
+                return BuildCardSnapshot(controller, source);
+            }
+            catch (Exception ex)
+            {
+                RuntimeStateCache.Logger?.LogDebug("UI card snapshot failed: " + ex.Message);
+                return null;
+            }
+        }
+
         public static void TryCapture(object controller, string source)
         {
             try
             {
-                CardSnapshot card = BuildCardSnapshot(controller, source);
+                CardSnapshot card = TryBuildSnapshot(controller, source);
                 bool changed = RuntimeStateCache.RecordUiCard(card);
+                if (RuntimeStateCache.LatestGameStateSnapshot == null)
+                {
+                    object dto = StateProbe.TryRecoverInitialGameState();
+                    if (dto != null)
+                    {
+                        RuntimeStateCache.LatestGameStateSnapshot = dto;
+                        RuntimeStateCache.Logger?.LogInfo(
+                            "Recovered initial game state after first live card event.");
+                    }
+                }
+                Plugin.RequestEventExport();
                 if (changed && card != null && !string.IsNullOrEmpty(card.id))
                 {
                     RuntimeStateCache.Logger?.LogInfo(

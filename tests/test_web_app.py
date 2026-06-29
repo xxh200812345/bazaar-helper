@@ -21,6 +21,25 @@ DATA_DIR = PROJECT_ROOT / "data"
 
 
 class WebAppResilienceTests(unittest.TestCase):
+    def test_runtime_payload_does_not_fall_back_to_example_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            missing_path = Path(tmp_dir) / "missing-state.json"
+            with patch.object(web_app, "STATE_PATH", missing_path):
+                with self.assertRaises(FileNotFoundError):
+                    web_app.load_runtime_payload()
+
+    def test_runtime_payload_rejects_stale_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            state_path = Path(tmp_dir) / "game_state.json"
+            state_path.write_text('{"source": "bepinex"}', encoding="utf-8")
+            stale_time = state_path.stat().st_mtime + web_app.MAX_STATE_AGE_SECONDS + 1
+            with (
+                patch.object(web_app, "STATE_PATH", state_path),
+                patch.object(web_app.time, "time", return_value=stale_time),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "停止更新"):
+                    web_app.load_runtime_payload()
+
     def test_json_responses_disable_browser_cache(self) -> None:
         handler = object.__new__(web_app.BazaarHandler)
         handler.wfile = BytesIO()

@@ -328,5 +328,348 @@
     "wanted_tags": [],
     "event_priorities": [],
     "avoid_events": []
+  },
+  "wuqi": {
+    "hero": "Vanessa",
+    "display_name": "武器（前中）",
+    "applicable_stages": [
+      "early",
+      "mid"
+    ],
+    "day_range": [
+      1,
+      null
+    ],
+    "build_summary": "武器开",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Sharkclaws",
+      "Aila's Package",
+      "Wetware",
+      "Pet Rock"
+    ],
+    "transition_cards": [
+      "Handaxe",
+      "Cove",
+      "Astrolabe",
+      "Star Chart",
+      "Tropical Island",
+      "Fishing Net",
+      "Wanted Poster",
+      "Grenade",
+      "Switchblade",
+      "Concealed Dagger"
+    ],
+    "optional_cards": [
+      "Marlon",
+      "Shoe Blade",
+      "Grapeshot",
+      "Revolver",
+      "Zoarcid",
+      "Narwhal"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "huokai": {
+    "hero": "Vanessa",
+    "display_name": "火开（前中）",
+    "applicable_stages": [
+      "early",
+      "mid"
+    ],
+    "day_range": [
+      1,
+      null
+    ],
+    "build_summary": "火开",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Volcanic Vents",
+      "Bonfire",
+      "Goggles",
+      "Zoarcid",
+      "Burnacuda"
+    ],
+    "transition_cards": [
+      "Arbalest",
+      "Trebuchet",
+      "Astrolabe",
+      "Star Chart",
+      "Tropical Island",
+      "Fishing Net",
+      "Wanted Poster",
+      "Cannon",
+      "Lighter",
+      "Pop Snappers",
+      "Chum"
+    ],
+    "optional_cards": [
+      "Port"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "shuichan": {
+    "hero": "Vanessa",
+    "display_name": "水产（前中）",
+    "applicable_stages": [
+      "early",
+      "mid"
+    ],
+    "day_range": [
+      1,
+      null
+    ],
+    "build_summary": "水产",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Burnacuda",
+      "Coral",
+      "Coral Armor",
+      "Seaweed",
+      "Seadog's Saloon",
+      "Elemental Depth Charge"
+    ],
+    "transition_cards": [
+      "Chum",
+      "Sea Shell",
+      "Figurehead",
+      "Jellyfish",
+      "Yeti Crab",
+      "IllusoRay",
+      "Mantis Shrimp",
+      "Astrolabe",
+      "Star Chart",
+      "Tropical Island",
+      "Fishing Net",
+      "Wanted Poster"
+    ],
+    "optional_cards": [
+      "Catfish",
+      "Torpedo",
+      "Zoarcid"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "suoziyudeng": {
+    "hero": "Vanessa",
+    "display_name": "梭子鱼相关阵容",
+    "applicable_stages": [
+      "early",
+      "mid",
+      "late"
+    ],
+    "day_range": [
+      4,
+      null
+    ],
+    "build_summary": "梭子鱼相关阵容",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Captain's Quarters",
+      "Flagship",
+      "Burnacuda"
+    ],
+    "transition_cards": [
+      "Chum",
+      "Zoarcid",
+      "Lighter",
+      "Korxena Crest",
+      "Grapeshot"
+    ],
+    "optional_cards": [
+      "Handaxe",
+      "Revolver",
+      "Switchblade"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "chongwushideng": {
+    "hero": "Vanessa",
+    "display_name": "宠物石相关阵容",
+    "applicable_stages": [
+      "early",
+      "mid",
+      "late"
+    ],
+    "day_range": [
+      4,
+      null
+    ],
+    "build_summary": "宠物石相关阵容",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Pet Rock",
+      "Cyber-Sai",
+      "Scimitar of the Deep",
+      "Holsters",
+      "Throwing Knives"
+    ],
+    "transition_cards": [
+      "Sharkclaws",
+      "Handaxe",
+      "Shoe Blade",
+      "Grenade",
+      "Revolver",
+      "Switchblade"
+    ],
+    "optional_cards": [
+      "Shuriken"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "qijian": {
+    "hero": "Vanessa",
+    "display_name": "旗舰",
+    "applicable_stages": [
+      "mid",
+      "late"
+    ],
+    "day_range": [
+      7,
+      null
+    ],
+    "build_summary": "旗舰",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Burnacuda",
+      "Korxena Crest",
+      "Flagship",
+      "Swash Buckle",
+      "Crow's Nest"
+    ],
+    "transition_cards": [
+      "Dive Weights"
+    ],
+    "optional_cards": [
+      "Throwing Knives",
+      "Figurehead"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "duowuqihuo": {
+    "hero": "Vanessa",
+    "display_name": "多武器火",
+    "applicable_stages": [
+      "mid",
+      "late"
+    ],
+    "day_range": [
+      7,
+      null
+    ],
+    "build_summary": "多武器火",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Burnacuda",
+      "Holsters",
+      "Incendiary Rounds",
+      "Cannonade",
+      "Powder Keg",
+      "Blunderbuss"
+    ],
+    "transition_cards": [
+      "Pop Snappers",
+      "Lighter"
+    ],
+    "optional_cards": [
+      "Slumbering Primordial",
+      "Swash Buckle",
+      "Zoarcid",
+      "Repeater",
+      "Shuriken",
+      "Ramrod"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "dagui": {
+    "hero": "Vanessa",
+    "display_name": "龟龟",
+    "applicable_stages": [
+      "mid",
+      "late"
+    ],
+    "day_range": [
+      7,
+      null
+    ],
+    "build_summary": "龟龟伙伴",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Burnacuda",
+      "Holsters",
+      "Tortuga",
+      "Shipwreck"
+    ],
+    "transition_cards": [
+      "Sharkray",
+      "Pesky Pete",
+      "Zoarcid",
+      "IllusoRay",
+      "Starfish",
+      "Jellyfish",
+      "Pufferfish",
+      "Narwhal"
+    ],
+    "optional_cards": [],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "kezong": {
+    "hero": "Vanessa",
+    "display_name": "克总",
+    "applicable_stages": [
+      "mid",
+      "late"
+    ],
+    "day_range": [
+      7,
+      null
+    ],
+    "build_summary": "克总",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Burnacuda",
+      "Holsters",
+      "Incendiary Rounds",
+      "Slumbering Primordial",
+      "Shipwreck",
+      "Iceberg"
+    ],
+    "transition_cards": [
+      "Elemental Depth Charge",
+      "Seadog's Saloon",
+      "Weather Glass",
+      "Jellyfish",
+      "Pufferfish",
+      "IllusoRay"
+    ],
+    "optional_cards": [],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
   }
 }

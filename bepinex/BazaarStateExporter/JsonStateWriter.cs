@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 namespace BazaarStateExporter
 {
@@ -19,16 +20,46 @@ namespace BazaarStateExporter
                 Directory.CreateDirectory(directory);
             }
 
-            string tempPath = fullPath + ".tmp";
-            File.WriteAllText(tempPath, ToJson(snapshot), Utf8NoBom);
-
-            if (File.Exists(fullPath))
+            string tempPath = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
             {
-                File.Replace(tempPath, fullPath, null);
+                File.WriteAllText(tempPath, ToJson(snapshot), Utf8NoBom);
+                for (int attempt = 0; ; attempt++)
+                {
+                    try
+                    {
+                        if (File.Exists(fullPath))
+                        {
+                            File.Replace(tempPath, fullPath, null);
+                        }
+                        else
+                        {
+                            File.Move(tempPath, fullPath);
+                        }
+                        return;
+                    }
+                    catch (IOException)
+                    {
+                        if (attempt >= 4)
+                        {
+                            throw;
+                        }
+                        Thread.Sleep(20);
+                    }
+                }
             }
-            else
+            finally
             {
-                File.Move(tempPath, fullPath);
+                try
+                {
+                    if (File.Exists(tempPath))
+                    {
+                        File.Delete(tempPath);
+                    }
+                }
+                catch (IOException)
+                {
+                }
             }
         }
 

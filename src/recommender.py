@@ -234,8 +234,10 @@ def infer_possible_cards_for_event(
     )
     hero_scope = normalize_text(pool_rule.get("hero_scope") or "current")
     current_hero = normalize_text(current_hero)
+    event_category = normalize_text(event_data.get("event_category"))
     event_name = normalize_text(event_data.get("name"))
     allows_packages = event_name in {"farai", "法莱"}
+    allows_loot = bool(pool_rule.get("allow_loot")) or bool(exact_names)
     expected_card_type = "skill" if event_has_skill_reward(event_data) else "item"
 
     rarity_filter = resolve_event_rarity_filter(pool_rule, current_day, rarity_rules)
@@ -254,6 +256,11 @@ def infer_possible_cards_for_event(
         card_tags = normalize_text_list(card_data.get("tags", []))
         if "package" in card_tags and not allows_packages:
             continue
+        if event_category == "shops":
+            if any(tag in card_tags for tag in {"legendary", "debug", "template"}):
+                continue
+            if "loot" in card_tags and not allows_loot:
+                continue
         card_min = normalize_text(card_data.get("min_rarity"))
         card_max = normalize_text(card_data.get("max_rarity"))
 
@@ -263,12 +270,15 @@ def infer_possible_cards_for_event(
         card_hero = normalize_text(card_data.get("hero"))
         card_heroes = {normalize_text(hero) for hero in card_data.get("heroes", [])}
 
-        if hero_filter and hero_filter not in ({card_hero} | card_heroes):
-            continue
-
-        if not hero_filter and hero_scope != "any" and current_hero:
-            if current_hero not in ({card_hero} | card_heroes) and "common" not in card_heroes:
+        card_hero_pool = {card_hero} | card_heroes
+        if hero_scope == "fixed":
+            if not hero_filter or hero_filter not in card_hero_pool:
                 continue
+        elif hero_scope == "current":
+            if not current_hero or current_hero not in card_hero_pool:
+                continue
+        elif hero_scope != "any":
+            continue
 
         if size_filter and normalize_text(card_data.get("size")) not in size_filter:
             continue

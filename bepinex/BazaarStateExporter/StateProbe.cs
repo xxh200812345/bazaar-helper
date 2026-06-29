@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using HarmonyLib;
 using UnityEngine;
 
 namespace BazaarStateExporter
@@ -18,7 +19,6 @@ namespace BazaarStateExporter
         private int? lastLoggedUiHealth;
         private bool loggedUiCandidate;
         private string lastSnapshotHero;
-        private object lastProcessorHistoryDto;
 
         public StateProbe(ManualLogSource logger)
         {
@@ -27,42 +27,17 @@ namespace BazaarStateExporter
 
         public GameStateSnapshot TryReadCurrentState()
         {
-            object cachedDto = RuntimeStateCache.LatestGameStateSnapshot;
-            object historyDto = TryReadLatestGameStateFromProcessorHistory();
-            if (historyDto != null && lastProcessorHistoryDto == null)
+            object processor = RuntimeStateCache.NetMessageProcessor;
+            if (processor != null)
             {
-                lastProcessorHistoryDto = historyDto;
-            }
-            else if (historyDto != null && !ReferenceEquals(historyDto, lastProcessorHistoryDto))
-            {
-                lastProcessorHistoryDto = historyDto;
-                string cachedHero = HeroFromGameStateDto(cachedDto);
-                string historyHero = HeroFromGameStateDto(historyDto);
-                int historyDay = DayFromGameStateDto(historyDto);
-                bool crossHero = !string.IsNullOrEmpty(cachedHero)
-                    && !string.IsNullOrEmpty(historyHero)
-                    && !string.Equals(cachedHero, historyHero, StringComparison.OrdinalIgnoreCase);
-
-                if (crossHero && historyDay > 1)
+                object latestDto = TryReadLatestGameStateFromProcessor(processor);
+                if (latestDto != null)
                 {
-                    logger.LogDebug(
-                        "Ignored cross-hero GameStateSnapshotDTO from processor history: current="
-                        + cachedHero
-                        + " candidate="
-                        + historyHero
-                        + " candidateDay="
-                        + historyDay);
-                }
-                else
-                {
-                    RuntimeStateCache.LatestGameStateSnapshot = historyDto;
-                    cachedDto = historyDto;
-                    logger.LogInfo("Refreshed GameStateSnapshotDTO from NetMessageProcessor history.");
+                    RuntimeStateCache.LatestGameStateSnapshot = latestDto;
                 }
             }
 
-            object dto = cachedDto ?? historyDto;
-
+            object dto = RuntimeStateCache.LatestGameStateSnapshot;
             if (dto == null)
             {
                 if (!warnedOnce)
@@ -77,52 +52,60 @@ namespace BazaarStateExporter
             return SnapshotFromGameStateDto(dto);
         }
 
-        private static string HeroFromGameStateDto(object dto)
+        public GameStateSnapshot TryReadCachedState()
         {
-            return StringValue(GetField(GetField(dto, "Player"), "Hero"));
+            return TryReadCurrentState();
         }
 
-        private static int DayFromGameStateDto(object dto)
+        public static object TryReadLatestGameStateFromProcessor(object processor)
         {
-            return IntValue(GetField(GetField(dto, "Run"), "Day"), 0);
-        }
-
-        private object TryReadLatestGameStateFromProcessorHistory()
-        {
-            MonoBehaviour[] behaviours = Resources.FindObjectsOfTypeAll<MonoBehaviour>();
-            foreach (MonoBehaviour behaviour in behaviours)
+            if (processor == null
+                || processor.GetType().FullName != "TheBazaar.NetMessageProcessor")
             {
-                if (behaviour == null)
-                {
-                    continue;
-                }
+                return null;
+            }
 
-                Type type = behaviour.GetType();
-                if (type.FullName != "TheBazaar.NetMessageProcessor")
-                {
-                    continue;
-                }
+            object lastMessage = GetField(processor, "_lastMessage");
+            object dto = TryGetDataFromGameStateMessage(lastMessage);
+            if (dto != null)
+            {
+                return dto;
+            }
 
-                object lastMessage = GetField(behaviour, "_lastMessage");
-                object dto = TryGetDataFromGameStateMessage(lastMessage);
+            IList messages = GetField(processor, "_lastMessages") as IList;
+            if (messages == null)
+            {
+                return null;
+            }
+
+            for (int index = messages.Count - 1; index >= 0; index--)
+            {
+                dto = TryGetDataFromGameStateMessage(messages[index]);
                 if (dto != null)
                 {
                     return dto;
                 }
+            }
 
-                IList messages = GetField(behaviour, "_lastMessages") as IList;
-                if (messages == null)
-                {
-                    continue;
-                }
+            return null;
+        }
 
-                for (int index = messages.Count - 1; index >= 0; index--)
+        public static object TryRecoverInitialGameState()
+        {
+            Type processorType = AccessTools.TypeByName("TheBazaar.NetMessageProcessor");
+            if (processorType == null)
+            {
+                return null;
+            }
+
+            UnityEngine.Object[] processors = Resources.FindObjectsOfTypeAll(processorType);
+            foreach (UnityEngine.Object processor in processors)
+            {
+                RuntimeStateCache.NetMessageProcessor = processor;
+                object dto = TryReadLatestGameStateFromProcessor(processor);
+                if (dto != null)
                 {
-                    dto = TryGetDataFromGameStateMessage(messages[index]);
-                    if (dto != null)
-                    {
-                        return dto;
-                    }
+                    return dto;
                 }
             }
 
@@ -155,31 +138,31 @@ namespace BazaarStateExporter
 
         public void ScanVisibleUiCards()
         {
-            MonoBehaviour[] behaviours = Resources.FindObjectsOfTypeAll<MonoBehaviour>();
-            foreach (MonoBehaviour behaviour in behaviours)
+            Type cardControllerType = AccessTools.TypeByName("CardController");
+            if (cardControllerType == null)
             {
-                if (behaviour == null)
-                {
-                    continue;
-                }
-
-                Type type = behaviour.GetType();
-                if (type.FullName != "CardController"
-                    && type.BaseType != null
-                    && type.BaseType.FullName != "CardController")
-                {
-                    continue;
-                }
-
-                // Pooled CardControllers can keep IsCardVisible=true after their event
-                // closes. Only active hierarchy objects belong to the current screen.
-                if (!behaviour.gameObject.activeInHierarchy)
-                {
-                    continue;
-                }
-
-                UiCardCapture.TryCapture(behaviour, "visible_scan");
+                RuntimeStateCache.SetCurrentVisibleCards(new List<CardSnapshot>());
+                return;
             }
+
+            List<CardSnapshot> visibleCards = new List<CardSnapshot>();
+            UnityEngine.Object[] controllers = Resources.FindObjectsOfTypeAll(cardControllerType);
+            foreach (UnityEngine.Object controller in controllers)
+            {
+                MonoBehaviour behaviour = controller as MonoBehaviour;
+                if (behaviour == null || !behaviour.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                CardSnapshot card = UiCardCapture.TryBuildSnapshot(behaviour, "visible_scan");
+                if (card != null && !string.IsNullOrEmpty(card.id))
+                {
+                    visibleCards.Add(card);
+                }
+            }
+
+            RuntimeStateCache.SetCurrentVisibleCards(visibleCards);
         }
 
         private void LogLoadedAssemblies()
@@ -341,15 +324,14 @@ namespace BazaarStateExporter
                 event_option_ids = StringList(GetField(currentState, "SelectionSet")),
             };
 
-            snapshot.event_options.AddRange(snapshot.event_option_ids);
-            snapshot.owned_cards.AddRange(CardList(GetProperty(dto, "GetPlayerHandCards")));
-            snapshot.owned_cards.AddRange(CardList(GetProperty(dto, "GetPlayerStashCards")));
-            snapshot.owned_cards.AddRange(CardList(GetProperty(dto, "GetPlayerSkillsCards")));
-
             object allCards = GetField(dto, "Cards");
+            List<CardSnapshot> allCardSnapshots = CardList(allCards).ToList();
+            snapshot.event_options.AddRange(snapshot.event_option_ids);
+            snapshot.owned_cards.AddRange(BuildCurrentOwnedCards(dto, allCardSnapshots));
+
             HashSet<string> eventOptionIdSet = new HashSet<string>(snapshot.event_option_ids);
             HashSet<string> detailedEventOptionIds = new HashSet<string>();
-            foreach (CardSnapshot card in CardList(allCards))
+            foreach (CardSnapshot card in allCardSnapshots)
             {
                 if (!string.IsNullOrEmpty(card.id) && eventOptionIdSet.Contains(card.id))
                 {
@@ -391,11 +373,6 @@ namespace BazaarStateExporter
             snapshot.health = FindAttribute(attributes, "Health");
             RuntimeStateCache.UpdateResources(snapshot.gold, snapshot.health, "game_state_sync");
 
-            int? uiGold;
-            int? uiHealth;
-            TryReadUiResources(logger, out uiGold, out uiHealth);
-            RuntimeStateCache.UpdateResources(uiGold, uiHealth, "ui_text");
-
             if (RuntimeStateCache.LatestGold.HasValue)
             {
                 snapshot.gold = RuntimeStateCache.LatestGold;
@@ -423,6 +400,59 @@ namespace BazaarStateExporter
             }
 
             return snapshot;
+        }
+
+        private static List<CardSnapshot> BuildCurrentOwnedCards(
+            object dto,
+            List<CardSnapshot> allCards)
+        {
+            List<CardSnapshot> result = new List<CardSnapshot>();
+            HashSet<string> seenIds = new HashSet<string>();
+
+            // Only the live card section decides item ownership. Historical
+            // hand/stash getters can retain an instance after it is sold.
+            foreach (CardSnapshot card in allCards)
+            {
+                if (card == null || !IsOwnedItemSection(card.section))
+                {
+                    continue;
+                }
+
+                AddUniqueCard(result, seenIds, card);
+            }
+
+            // Skills do not consistently use Hand/Stash sections.
+            foreach (CardSnapshot skill in CardList(GetProperty(dto, "GetPlayerSkillsCards")))
+            {
+                AddUniqueCard(result, seenIds, skill);
+            }
+
+            return result;
+        }
+
+        private static bool IsOwnedItemSection(string section)
+        {
+            return string.Equals(section, "Hand", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(section, "Stash", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void AddUniqueCard(
+            List<CardSnapshot> cards,
+            HashSet<string> seenIds,
+            CardSnapshot card)
+        {
+            if (card == null)
+            {
+                return;
+            }
+
+            string identity = !string.IsNullOrEmpty(card.id)
+                ? "id:" + card.id
+                : "template:" + (card.template_id ?? "") + "|name:" + (card.name ?? "");
+            if (seenIds.Add(identity))
+            {
+                cards.Add(card);
+            }
         }
 
         private void TryReadUiResources(ManualLogSource log, out int? gold, out int? health)
@@ -831,14 +861,16 @@ namespace BazaarStateExporter
             HashSet<string> eventOptionIdSet,
             HashSet<string> detailedEventOptionIds)
         {
-            List<CardSnapshot> capturedCards = RuntimeStateCache.GetCapturedUiCards(2.0f);
-            List<CardSnapshot> recentEventCards = capturedCards
+            List<CardSnapshot> capturedCards = RuntimeStateCache.GetCurrentVisibleCards();
+            List<CardSnapshot> currentEventCards = capturedCards
                 .Where(card => card != null
                     && !string.IsNullOrEmpty(card.id)
-                    && ((card.card_type ?? "").IndexOf("Encounter", StringComparison.OrdinalIgnoreCase) >= 0))
+                    && (card.card_type ?? "").IndexOf(
+                        "Encounter",
+                        StringComparison.OrdinalIgnoreCase) >= 0)
                 .ToList();
 
-            if (recentEventCards.Count > 0)
+            if (currentEventCards.Count > 0)
             {
                 snapshot.event_options.Clear();
                 snapshot.event_option_ids.Clear();
@@ -849,7 +881,6 @@ namespace BazaarStateExporter
             }
 
             HashSet<string> visibleIds = new HashSet<string>(snapshot.visible_cards.Select(card => card.id).Where(id => !string.IsNullOrEmpty(id)));
-            HashSet<string> ownedIds = new HashSet<string>(snapshot.owned_cards.Select(card => card.id).Where(id => !string.IsNullOrEmpty(id)));
             HashSet<string> templateIds = new HashSet<string>(snapshot.event_option_template_ids);
             HashSet<string> eventNames = new HashSet<string>(snapshot.event_options);
 
@@ -876,19 +907,18 @@ namespace BazaarStateExporter
                 }
 
                 string section = card.section ?? "";
-                string cardType = card.card_type ?? "";
-                bool eventCard = cardType.IndexOf("Encounter", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool eventCard = (card.card_type ?? "").IndexOf(
+                    "Encounter",
+                    StringComparison.OrdinalIgnoreCase) >= 0;
                 if (eventCard)
                 {
-                    if (!eventOptionIdSet.Contains(card.id))
+                    if (eventOptionIdSet.Add(card.id))
                     {
-                        eventOptionIdSet.Add(card.id);
                         snapshot.event_option_ids.Add(card.id);
                     }
-
                     AddEventOptionDetailed(snapshot, card, detailedEventOptionIds);
-
-                    if (!string.IsNullOrEmpty(card.template_id) && templateIds.Add(card.template_id))
+                    if (!string.IsNullOrEmpty(card.template_id)
+                        && templateIds.Add(card.template_id))
                     {
                         snapshot.event_option_template_ids.Add(card.template_id);
                     }

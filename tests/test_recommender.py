@@ -213,7 +213,7 @@ class RecommenderTests(unittest.TestCase):
             all("Vanessa" in card["raw"].get("heroes", []) for card in cards)
         )
 
-    def test_default_shop_pool_uses_current_hero_or_common(self) -> None:
+    def test_default_shop_pool_uses_only_current_hero(self) -> None:
         data = load_all_data(DATA_DIR)
         cards, _ = infer_possible_cards_for_event(
             event_data=data["events"]["Colt"],
@@ -226,12 +226,94 @@ class RecommenderTests(unittest.TestCase):
         self.assertTrue(cards)
         self.assertTrue(
             all(
-                card["raw"]["hero"] in {"Vanessa", "Common"}
+                card["raw"]["hero"] == "Vanessa"
                 or "Vanessa" in card["raw"].get("heroes", [])
-                or "Common" in card["raw"].get("heroes", [])
                 for card in cards
             )
         )
+
+    def test_shop_pool_scope_and_default_tag_rules(self) -> None:
+        def card(hero: str, *tags: str) -> dict:
+            return {
+                "type": "Item",
+                "hero": hero,
+                "heroes": [hero],
+                "size": "Small",
+                "tags": list(tags),
+                "min_rarity": "bronze",
+                "max_rarity": "diamond",
+            }
+
+        cards = {
+            "Current": card("Vanessa"),
+            "Neutral": card("Common"),
+            "Other": card("Pygmalien"),
+            "Loot": card("Vanessa", "loot"),
+            "Package": card("Vanessa", "package"),
+            "Legendary": card("Vanessa", "legendary"),
+            "Debug": card("Vanessa", "debug"),
+            "Template": card("Vanessa", "template"),
+        }
+        base_event = {
+            "event_category": "shops",
+            "event_heroes": ["Common"],
+            "shop_pool": {},
+        }
+
+        current_pool, _ = infer_possible_cards_for_event(
+            base_event, cards, 5, {}, current_hero="Vanessa"
+        )
+        self.assertEqual([entry["name"] for entry in current_pool], ["Current"])
+
+        any_pool, _ = infer_possible_cards_for_event(
+            {**base_event, "shop_pool": {"hero_scope": "any"}},
+            cards,
+            5,
+            {},
+            current_hero="Vanessa",
+        )
+        self.assertEqual(
+            {entry["name"] for entry in any_pool},
+            {"Current", "Neutral", "Other"},
+        )
+
+        common_pool, _ = infer_possible_cards_for_event(
+            {
+                **base_event,
+                "shop_pool": {
+                    "hero_scope": "fixed",
+                    "hero_filter": "Common",
+                },
+            },
+            cards,
+            5,
+            {},
+            current_hero="Vanessa",
+        )
+        self.assertEqual([entry["name"] for entry in common_pool], ["Neutral"])
+
+    def test_shop_loot_requires_allow_loot_or_exact_names(self) -> None:
+        loot_card = {
+            "Loot": {
+                "type": "Item",
+                "hero": "Vanessa",
+                "heroes": ["Vanessa"],
+                "size": "Small",
+                "tags": ["loot"],
+                "min_rarity": "bronze",
+                "max_rarity": "diamond",
+            }
+        }
+
+        for shop_pool in ({"allow_loot": True}, {"exact_names": ["Loot"]}):
+            cards, _ = infer_possible_cards_for_event(
+                {"event_category": "shops", "shop_pool": shop_pool},
+                loot_card,
+                5,
+                {},
+                current_hero="Vanessa",
+            )
+            self.assertEqual([entry["name"] for entry in cards], ["Loot"])
 
     def test_any_hero_shop_pool_can_include_other_heroes(self) -> None:
         data = load_all_data(DATA_DIR)
@@ -250,8 +332,8 @@ class RecommenderTests(unittest.TestCase):
         cards = {
             "Test Item": {
                 "type": "Item",
-                "hero": "Common",
-                "heroes": ["Common"],
+                "hero": "Vanessa",
+                "heroes": ["Vanessa"],
                 "size": "Small",
                 "tags": [],
                 "min_rarity": "bronze",
@@ -259,8 +341,8 @@ class RecommenderTests(unittest.TestCase):
             },
             "Test Skill": {
                 "type": "Skill",
-                "hero": "Common",
-                "heroes": ["Common"],
+                "hero": "Vanessa",
+                "heroes": ["Vanessa"],
                 "size": "Medium",
                 "tags": [],
                 "min_rarity": "bronze",
