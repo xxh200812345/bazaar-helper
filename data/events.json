@@ -2682,13 +2682,13 @@
         "match_mode": "any",
         "rarity_filter": {
           "min": "silver",
-          "max": "silver"
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -2762,8 +2762,8 @@
         ],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "silver",
-          "max": "silver"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
@@ -2843,8 +2843,8 @@
         ],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "gold",
-          "max": "gold"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
@@ -2995,14 +2995,14 @@
         "reward_tags": [],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "silver",
-          "max": "silver"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -3044,7 +3044,7 @@
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -3145,7 +3145,7 @@
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -3187,7 +3187,7 @@
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -3617,7 +3617,7 @@
         "match_mode": "any",
         "rarity_filter": {
           "min": "bronze",
-          "max": "bronze"
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
@@ -3741,7 +3741,7 @@
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -3782,7 +3782,7 @@
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -3926,8 +3926,8 @@
         ],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "silver",
-          "max": "silver"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
@@ -3967,8 +3967,8 @@
         ],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "silver",
-          "max": "silver"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
@@ -4008,14 +4008,14 @@
         "reward_tags": [],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "silver",
-          "max": "silver"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -4328,8 +4328,8 @@
         ],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "silver",
-          "max": "silver"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
@@ -4370,8 +4370,8 @@
         ],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "silver",
-          "max": "silver"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
@@ -4418,7 +4418,7 @@
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -4530,8 +4530,8 @@
         "reward_tags": [],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "gold",
-          "max": "gold"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
@@ -4606,7 +4606,7 @@
         ],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "diamond",
+          "min": "bronze",
           "max": "diamond"
         },
         "rarity_rule": null,
@@ -4688,7 +4688,7 @@
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -4808,7 +4808,7 @@
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -4954,13 +4954,13 @@
         "match_mode": "any",
         "rarity_filter": {
           "min": "bronze",
-          "max": "bronze"
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -4994,7 +4994,7 @@
         ],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "diamond",
+          "min": "bronze",
           "max": "diamond"
         },
         "rarity_rule": null,
@@ -5203,7 +5203,7 @@
         ],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "diamond",
+          "min": "bronze",
           "max": "diamond"
         },
         "rarity_rule": null,
@@ -5244,14 +5244,14 @@
         "reward_tags": [],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "gold",
-          "max": "gold"
+          "min": "bronze",
+          "max": "diamond"
         },
         "rarity_rule": null,
         "excluded_tags": [
           "legendary"
         ],
-        "hero_scope": "current"
+        "hero_scope": "any"
       },
       "resource_rewards": {
         "gold": 0,
@@ -5314,8 +5314,8 @@
         "reward_tags": [],
         "match_mode": "any",
         "rarity_filter": {
-          "min": "silver",
-          "max": "silver"
+          "min": "bronze",
+          "max": "gold"
         },
         "rarity_rule": null,
         "excluded_tags": [
@@ -5439,6 +5439,28 @@
     }
   ],
   "item_events": [
+    {
+      "name": "Advanced Training",
+      "source_id": "6a5e82cf-969c-432a-863a-1df6e7f56513",
+      "source_ids": [
+        "6a5e82cf-969c-432a-863a-1df6e7f56513"
+      ],
+      "event_heroes": [
+        "Common"
+      ],
+      "event_type": "item_event",
+      "effect": "improve_items",
+      "target_tags": [],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": null,
+      "resource_rewards": {
+        "gold": 0,
+        "exp": 0,
+        "health": 0
+      },
+      "notes": "Be all that you can be with Sergeant Suds (Give Types to your items)"
+    },
     {
       "name": "Aldric",
       "source_id": "78cf8b25-5812-4b9a-a9ff-9694c86e7a90",
@@ -5760,6 +5782,54 @@
         "health": 0
       },
       "notes": "Upgrade item"
+    },
+    {
+      "name": "Upgrade an item",
+      "source_id": "6c93da83-44d1-4f06-893d-0a23428c9b6c",
+      "source_ids": [
+        "6c93da83-44d1-4f06-893d-0a23428c9b6c",
+        "7ac16571-b3cf-41d9-a0e4-8acf36ed5721",
+        "b39a2b7d-04da-4e16-9869-ec90e07b11cd"
+      ],
+      "event_heroes": [
+        "Common"
+      ],
+      "event_type": "item_event",
+      "effect": "upgrade_items",
+      "target_tags": [
+        "weapon"
+      ],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": null,
+      "resource_rewards": {
+        "gold": 0,
+        "exp": 0,
+        "health": 0
+      },
+      "notes": "Upgrade your leftmost Weapon"
+    },
+    {
+      "name": "Wink",
+      "source_id": "3e4c4f1a-fe5d-4e38-887a-08666ce36e71",
+      "source_ids": [
+        "3e4c4f1a-fe5d-4e38-887a-08666ce36e71"
+      ],
+      "event_heroes": [
+        "Common"
+      ],
+      "event_type": "item_event",
+      "effect": "improve_items",
+      "target_tags": [],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": null,
+      "resource_rewards": {
+        "gold": 0,
+        "exp": 0,
+        "health": 0
+      },
+      "notes": "Randomizes and upgrade all your items"
     }
   ],
   "resource_events": [
@@ -7175,6 +7245,19 @@
       "notes": "You can travel almost anywhere! (infinite rerolls)"
     },
     {
+      "name": "Apothecary",
+      "source_id": "04ac552f-c292-455e-bf5f-438119dfa196",
+      "source_ids": [
+        "04ac552f-c292-455e-bf5f-438119dfa196"
+      ],
+      "event_heroes": [
+        "Common"
+      ],
+      "event_type": "utility_event",
+      "resource_rewards": {},
+      "notes": "Offers a variety of boons to defensive items"
+    },
+    {
       "name": "B1&B2",
       "source_id": "1b164a15-cf5d-459d-a010-3bf86b25cde8",
       "source_ids": [
@@ -7199,6 +7282,19 @@
       "event_type": "utility_event",
       "resource_rewards": {},
       "notes": "See all that the Bazaar has to offer"
+    },
+    {
+      "name": "Command Nexus",
+      "source_id": "54a0e045-36fe-4de4-92fb-9254fa73c48f",
+      "source_ids": [
+        "54a0e045-36fe-4de4-92fb-9254fa73c48f"
+      ],
+      "event_heroes": [
+        "Common"
+      ],
+      "event_type": "utility_event",
+      "resource_rewards": {},
+      "notes": "You have reached the core of the ship"
     },
     {
       "name": "Dooley's Crib",
@@ -7711,40 +7807,6 @@
   ],
   "unknown_events": [
     {
-      "name": "Advanced Training",
-      "source_id": "6a5e82cf-969c-432a-863a-1df6e7f56513",
-      "source_ids": [
-        "6a5e82cf-969c-432a-863a-1df6e7f56513"
-      ],
-      "event_heroes": [
-        "Common"
-      ],
-      "event_type": "unknown_event",
-      "resource_rewards": {
-        "gold": 0,
-        "exp": 0,
-        "health": 0
-      },
-      "notes": "Be all that you can be with Sergeant Suds (Give Types to your items)"
-    },
-    {
-      "name": "Apothecary",
-      "source_id": "04ac552f-c292-455e-bf5f-438119dfa196",
-      "source_ids": [
-        "04ac552f-c292-455e-bf5f-438119dfa196"
-      ],
-      "event_heroes": [
-        "Common"
-      ],
-      "event_type": "unknown_event",
-      "resource_rewards": {
-        "gold": 0,
-        "exp": 0,
-        "health": 0
-      },
-      "notes": "Offers a variety of boons to defensive items"
-    },
-    {
       "name": "Bex",
       "source_id": "34dc624d-1046-4e2d-906d-1fd8d19647d8",
       "source_ids": [
@@ -7829,23 +7891,6 @@
         "health": 0
       },
       "notes": "Get a consultation to improve your kitchen"
-    },
-    {
-      "name": "Command Nexus",
-      "source_id": "54a0e045-36fe-4de4-92fb-9254fa73c48f",
-      "source_ids": [
-        "54a0e045-36fe-4de4-92fb-9254fa73c48f"
-      ],
-      "event_heroes": [
-        "Common"
-      ],
-      "event_type": "unknown_event",
-      "resource_rewards": {
-        "gold": 0,
-        "exp": 0,
-        "health": 0
-      },
-      "notes": "You have reached the core of the ship"
     },
     {
       "name": "Crash Site Expedition",
@@ -8376,23 +8421,6 @@
       ]
     },
     {
-      "name": "Spawning Test",
-      "source_id": "7799fa37-567f-4356-bfa7-83e0fd0dd467",
-      "source_ids": [
-        "7799fa37-567f-4356-bfa7-83e0fd0dd467"
-      ],
-      "event_heroes": [
-        "Common"
-      ],
-      "event_type": "unknown_event",
-      "resource_rewards": {
-        "gold": 0,
-        "exp": 0,
-        "health": 0
-      },
-      "notes": "Large item spawning test"
-    },
-    {
       "name": "Temple Expedition",
       "source_id": "91287d25-7f63-4826-8c42-06ed1bf83213",
       "source_ids": [
@@ -8573,23 +8601,6 @@
           "source_internal_name": "Tutorial Day 2 Hour 5 - Pick Event - Result 2"
         }
       ]
-    },
-    {
-      "name": "Wink",
-      "source_id": "3e4c4f1a-fe5d-4e38-887a-08666ce36e71",
-      "source_ids": [
-        "3e4c4f1a-fe5d-4e38-887a-08666ce36e71"
-      ],
-      "event_heroes": [
-        "Common"
-      ],
-      "event_type": "unknown_event",
-      "resource_rewards": {
-        "gold": 0,
-        "exp": 0,
-        "health": 0
-      },
-      "notes": "Randomizes and upgrade all your items"
     },
     {
       "name": "[DEBUG] Farai",

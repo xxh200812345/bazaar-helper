@@ -79,6 +79,7 @@ RARITY_ALIASES = {
     "gold": "gold",
     "diamond": "diamond",
 }
+RARITY_ORDER = {"bronze": 1, "silver": 2, "gold": 3, "diamond": 4, "legendary": 5}
 
 HERO_NAMES = {"Vanessa", "Pygmalien", "Dooley", "Mak", "Jules", "Stelle", "Karnok"}
 SELECTABLE_CACHE_TYPES = {"TCardEncounterEvent", "TCardEncounterPedestal"}
@@ -302,7 +303,16 @@ def is_upgrade_item_event(event: dict[str, Any]) -> bool:
             )
             or "enchance your offensive items" in description
             or description.startswith("transform your items")
+            or "randomizes and upgrade all your items" in description
         )
+    )
+
+
+def is_item_modification_event(event: dict[str, Any]) -> bool:
+    description = (event.get("description") or "").lower()
+    return (
+        str(event.get("cache_type", "")).startswith("TCardEncounter")
+        and "give types to your items" in description
     )
 
 
@@ -463,6 +473,7 @@ def is_utility_event(event: dict[str, Any]) -> bool:
         "collected here",
         "claim your 3 wishes",
         "enter the thieves guild",
+        "offers a variety of boons to defensive items",
         "explore the exotic wilds",
         "glimpse of what the future holds",
         "journey begins here",
@@ -479,6 +490,7 @@ def is_utility_event(event: dict[str, Any]) -> bool:
         "travel almost anywhere",
         "wants to thank you",
         "you find a strange mushroom",
+        "you have reached the core of the ship",
     ]
     return any(phrase in description for phrase in utility_phrases)
 
@@ -534,7 +546,11 @@ def build_item_reward_event(event_name: str, event: dict[str, Any]) -> dict[str,
         "rarity_filter": rarity_filter,
         "rarity_rule": None if rarity_filter else "normal_shop_by_day",
         "excluded_tags": excluded_tags_from_description(description),
-        "hero_scope": hero_scope_from_description(description, None),
+        "hero_scope": (
+            "any"
+            if exact_names
+            else hero_scope_from_description(description, None)
+        ),
     }
     if size_filter:
         card_reward["size_filter"] = size_filter
@@ -712,6 +728,9 @@ def classify_event(event_name: str, event: dict[str, Any]) -> tuple[str, dict[st
     if is_upgrade_item_event(event):
         return "item_events", build_item_event(event_name, event)
 
+    if is_item_modification_event(event):
+        return "item_events", build_item_event(event_name, event)
+
     if is_item_reward_event(event):
         return "item_rewards", build_item_reward_event(event_name, event)
 
@@ -816,8 +835,40 @@ def merge_event(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str,
     merged = {**existing}
     merged["source_ids"] = source_ids
     merged["event_heroes"] = event_heroes
+    merge_rarity_filter_range(merged.get("shop_pool"), incoming.get("shop_pool"))
+    merge_rarity_filter_range(merged.get("card_reward"), incoming.get("card_reward"))
 
     return merged
+
+
+def merge_rarity_filter_range(
+    target_rule: dict[str, Any] | None,
+    incoming_rule: dict[str, Any] | None,
+) -> None:
+    if not isinstance(target_rule, dict) or not isinstance(incoming_rule, dict):
+        return
+    target_filter = target_rule.get("rarity_filter")
+    incoming_filter = incoming_rule.get("rarity_filter")
+    if not isinstance(target_filter, dict) or not isinstance(incoming_filter, dict):
+        return
+
+    target_min = target_filter.get("min")
+    target_max = target_filter.get("max")
+    incoming_min = incoming_filter.get("min")
+    incoming_max = incoming_filter.get("max")
+    if not all(value in RARITY_ORDER for value in (
+        target_min, target_max, incoming_min, incoming_max
+    )):
+        return
+
+    target_filter["min"] = min(
+        (target_min, incoming_min),
+        key=RARITY_ORDER.__getitem__,
+    )
+    target_filter["max"] = max(
+        (target_max, incoming_max),
+        key=RARITY_ORDER.__getitem__,
+    )
 
 
 def build_events(encounters: dict[str, Any]) -> dict[str, Any]:
@@ -844,10 +895,18 @@ def build_events(encounters: dict[str, Any]) -> dict[str, Any]:
             target[name] = incoming
 
     for raw_name, event in encounters.items():
+        name = clean_name(raw_name)
+        if name == "Spawning Test":
+            continue
+        if event.get("cache_type") == STEP_CACHE_TYPE and name == "Upgrade an item":
+            classified = classify_event(name, event)
+            if classified:
+                category_name, event_data = classified
+                add_event(item_events_by_name, name, event_data)
+            continue
         if event.get("cache_type") not in SELECTABLE_CACHE_TYPES:
             continue
 
-        name = clean_name(raw_name)
         if name.startswith("[") and name.endswith("]"):
             continue
 

@@ -182,5 +182,644 @@
         "notes": "Gain 2 Gold and a Weapon from any Hero."
       }
     ]
+  },
+    "Apothecary": {
+    "_override_reason": "人工修正：该事件描述为药房入口/父事件，基础库误标为 unknown；描述只说明提供防御物品相关增益，具体子选项收益待补。",
+    "event_type": "utility_event",
+    "event_category": "utility_events",
+    "resource_rewards": {},
+    "qualitative_rewards": [
+      "followup_options_pending"
+    ],
+    "notes": "Offers a variety of boons to defensive items. Parent/utility event; concrete boon options need separate testing."
+  },
+  "Command Nexus": {
+    "_override_reason": "人工修正：该事件描述为到达飞船核心，是入口/父事件；没有可直接解析的资源或卡池收益。",
+    "event_type": "utility_event",
+    "event_category": "utility_events",
+    "resource_rewards": {},
+    "qualitative_rewards": [
+      "followup_options_pending"
+    ],
+    "notes": "You have reached the core of the ship. Parent/utility event; concrete options need separate testing."
+  },
+  "Street Festival": {
+    "_override_reason": "人工修正：该事件描述为浏览商人摊位，基础库误标为 unknown；具体商店子选项待观察。",
+    "event_type": "utility_event",
+    "event_category": "utility_events",
+    "resource_rewards": {},
+    "qualitative_rewards": [
+      "followup_options_pending"
+    ],
+    "notes": "Browse the Merchant stalls. Parent/utility event; concrete merchant options need separate testing."
+  },
+  "Core Initialization": {
+    "_override_reason": "人工修正：描述为 Choose a Core，应限定为 Core 物品。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [
+        "core"
+      ],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": "normal_shop_by_day",
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Choose a Core."
+  },
+  "Get Bronze item": {
+    "_override_reason": "人工修正：描述为获得一件青铜物品，显式限定青铜品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "bronze",
+        "max": "bronze"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a Bronze-tier item."
+  },
+  "Get Silver item": {
+    "_override_reason": "人工修正：描述为获得一件白银物品，显式限定白银品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "silver",
+        "max": "silver"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a Silver-tier item."
+  },
+  "Get Gold item": {
+    "_override_reason": "人工修正：描述为获得一件黄金物品，显式限定黄金品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "gold",
+        "max": "gold"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a Gold-tier item."
+  },
+  "Get Diamond item": {
+    "_override_reason": "人工修正：描述为获得一件钻石物品，显式限定钻石品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "diamond",
+        "max": "diamond"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a Diamond-tier item."
+  },
+  "Gold or Diamond item": {
+    "_override_reason": "人工修正：描述为获得黄金或钻石物品，显式限定黄金到钻石品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "gold",
+        "max": "diamond"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a Gold or Diamond-tier item."
+  },
+  "Ifrit": {
+    "_override_reason": "人工修正：描述为 Get a Diamond item，原始结构使用按天数品质规则，需改成固定钻石品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "diamond",
+        "max": "diamond"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a Diamond item."
+  },
+  "Lost and Found": {
+    "_override_reason": "人工修正：描述为获得小型非武器物品，显式限定 small 并排除 weapon。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": "normal_shop_by_day",
+      "excluded_tags": [
+        "legendary",
+        "weapon"
+      ],
+      "hero_scope": "current",
+      "size_filter": [
+        "small"
+      ],
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a Small non-Weapon item."
+  },
+  "Recycling Center": {
+    "_override_reason": "人工修正：描述为获得非武器物品，显式排除 weapon。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": "normal_shop_by_day",
+      "excluded_tags": [
+        "legendary",
+        "weapon"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a non-Weapon item."
+  },
+  "Watch": {
+    "_override_reason": "人工修正：描述为获得小型物品，显式限定 small。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": "normal_shop_by_day",
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "size_filter": [
+        "small"
+      ],
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a Small item."
+  },
+  "Monster Ranch": {
+    "_override_reason": "人工修正：描述为选择一个免费 Loot 物品，需限定 loot 标签。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [
+        "loot"
+      ],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": "normal_shop_by_day",
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Choose a free Loot item."
+  },
+  "Rageforge": {
+    "_override_reason": "人工修正：描述为获得黄金 Rage 物品，需限定 rage 标签与 Gold 品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [
+        "rage"
+      ],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "gold",
+        "max": "gold"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a Gold-tier Rage item."
+  },
+  "Trophy Hunt": {
+    "_override_reason": "人工修正：描述为获得若干白银 Monster Loot，数量来自 ability.0，当前只先修正 Loot 卡池与白银品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "_dynamic_reward": true,
+    "qualitative_rewards": [
+      "dynamic_count"
+    ],
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [
+        "loot"
+      ],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "silver",
+        "max": "silver"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {},
+    "notes": "Get dynamic amount of Silver-tier Monster Loot."
+  },
+  "Get Bronze Loot": {
+    "_override_reason": "人工修正：描述为获得动态金币和青铜 Loot，需限定 loot 标签与 Bronze 品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "_dynamic_reward": true,
+    "qualitative_rewards": [
+      "gold"
+    ],
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [
+        "loot"
+      ],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "bronze",
+        "max": "bronze"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {},
+    "notes": "Get dynamic Gold and a Bronze-tier Loot item."
+  },
+  "Get Gold Loot": {
+    "_override_reason": "人工修正：描述为获得动态金币和黄金 Loot，需限定 loot 标签与 Gold 品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "_dynamic_reward": true,
+    "qualitative_rewards": [
+      "gold"
+    ],
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [
+        "loot"
+      ],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "gold",
+        "max": "gold"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {},
+    "notes": "Get dynamic Gold and a Gold-tier Loot item."
+  },
+  "Get Diamond Loot": {
+    "_override_reason": "人工修正：描述为获得动态金币和钻石 Loot，需限定 loot 标签与 Diamond 品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "_dynamic_reward": true,
+    "qualitative_rewards": [
+      "gold"
+    ],
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [
+        "loot"
+      ],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "diamond",
+        "max": "diamond"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {},
+    "notes": "Get dynamic Gold and a Diamond-tier Loot item."
+  },
+  "Get Gold or Diamond Loot": {
+    "_override_reason": "人工修正：描述为获得动态金币和黄金/钻石 Loot，需限定 loot 标签与 Gold-Diamond 品质。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "_dynamic_reward": true,
+    "qualitative_rewards": [
+      "gold"
+    ],
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [
+        "loot"
+      ],
+      "match_mode": "any",
+      "rarity_filter": {
+        "min": "gold",
+        "max": "diamond"
+      },
+      "rarity_rule": null,
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {},
+    "notes": "Get dynamic Gold and a Gold-tier or Diamond-tier Loot item."
+  },
+  "Pearl's Dig Site": {
+    "_override_reason": "人工修正：描述为免费挖掘物品，可能是任意物品且只能保留 1 个；用 any hero 近似“anything”。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "_approximation": "描述没有给出展示数量；这里仅按任意英雄物品池、选择/获得 1 个处理。",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": "normal_shop_by_day",
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "any",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Dig for a free item. It could be anything, but you can only keep one."
+  },
+  "Star Chart Treasure": {
+    "_override_reason": "人工修正：描述为获得一件物品，保留普通按天数品质物品池。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": "normal_shop_by_day",
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Gain an item."
+  },
+  "Treasure Chest": {
+    "_override_reason": "人工修正：描述为获得一件物品，保留普通按天数品质物品池。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": "normal_shop_by_day",
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "current",
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get an item."
+  },
+  "Magic Mirror": {
+    "_override_reason": "人工修正：描述为复制当前棋盘上的任意物品，不应按当前英雄随机物品池计算。",
+    "event_type": "item_event",
+    "event_category": "item_events",
+    "effect": "copy_board_item",
+    "_dynamic_reward": true,
+    "qualitative_rewards": [
+      "copy_board_item"
+    ],
+    "resource_rewards": {},
+    "notes": "Get a copy of any item on your board."
+  },
+  "Mystery Box": {
+    "_override_reason": "人工修正：描述为获得另一个英雄的小型附魔物品；当前规则不支持排除当前英雄，先用 any hero small item 近似，并保留 enchanted 标记。",
+    "event_type": "item_reward",
+    "event_category": "item_rewards",
+    "_approximation": "hero_scope=any 会包含当前英雄/Common；推荐器当前不支持 another_hero 或 enchanted 过滤。",
+    "qualitative_rewards": [
+      "enchanted",
+      "another_hero"
+    ],
+    "card_reward": {
+      "enabled": true,
+      "exact_names": [],
+      "reward_tags": [],
+      "match_mode": "any",
+      "rarity_filter": null,
+      "rarity_rule": "normal_shop_by_day",
+      "excluded_tags": [
+        "legendary"
+      ],
+      "hero_scope": "any",
+      "size_filter": [
+        "small"
+      ],
+      "count": 1
+    },
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Get a small enchanted item from another Hero."
+  },
+  "Shrouded Figure's Chest": {
+    "_override_reason": "人工修正：描述只有 Choose this Chest，无法从描述确定实际卡池；先作为待观察入口，避免误判为任意当前英雄物品。",
+    "event_type": "utility_event",
+    "event_category": "utility_events",
+    "_dynamic_reward": true,
+    "qualitative_rewards": [
+      "chest_reward_pending"
+    ],
+    "resource_rewards": {},
+    "notes": "Choose this Chest. Concrete reward pending observation."
+  },
+  "Rest": {
+    "_override_reason": "人工修正：描述为下一场战斗开始时按等级获得护盾，属于动态临时战斗增益，不是固定金币/物品。",
+    "_dynamic_reward": true,
+    "qualitative_rewards": [
+      "temporary_shield_per_level"
+    ],
+    "resource_rewards": {
+      "gold": 0,
+      "exp": 0,
+      "health": 0
+    },
+    "notes": "Start your next fight with 100 Shield per Level."
   }
 }

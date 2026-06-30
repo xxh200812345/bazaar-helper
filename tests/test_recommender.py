@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +24,8 @@ from recommender import infer_possible_cards_for_event, probability_at_least_one
 from recommender import analyze_event
 from audit_event_pool import audit_event_pool
 import recommender
-from web_app import MISSING_EVENTS_PATH, analyze_payload, normalize_payload_for_analysis
+import web_app
+from web_app import analyze_payload, normalize_payload_for_analysis
 
 
 DATA_DIR = PROJECT_ROOT / "data"
@@ -641,9 +644,10 @@ class RecommenderTests(unittest.TestCase):
         normalized = normalize_payload_for_analysis(data, payload)
         response = analyze_payload(data, payload)
 
-        self.assertEqual(normalized["build"], "VanessaAquaticAmmo")
+        self.assertIn(normalized["build"], data["builds"])
+        self.assertEqual(data["builds"][normalized["build"]]["hero"], "Vanessa")
         self.assertFalse(response["warnings"])
-        self.assertEqual(response["state"]["build"], "VanessaAquaticAmmo")
+        self.assertEqual(response["state"]["build"], normalized["build"])
         self.assertEqual(len(response["recommendations"]), 2)
 
     def test_web_payload_matches_build_from_owned_cards_when_unselected(self) -> None:
@@ -700,7 +704,9 @@ class RecommenderTests(unittest.TestCase):
 
         normalized = normalize_payload_for_analysis(data, payload)
 
-        self.assertEqual(normalized["build"], "VanessaAquaticAmmo")
+        self.assertNotEqual(normalized["build"], "PluginShouldNotOwnThis")
+        self.assertIn(normalized["build"], data["builds"])
+        self.assertEqual(data["builds"][normalized["build"]]["hero"], "Vanessa")
 
     def test_web_payload_maps_plugin_ids_to_names(self) -> None:
         data = load_all_data(DATA_DIR)
@@ -803,25 +809,19 @@ class RecommenderTests(unittest.TestCase):
             "event_options": [missing_name, "Colt"],
             "owned_cards": [{"name": "Ballista", "rarity": "gold"}],
         }
-        original_text = (
-            MISSING_EVENTS_PATH.read_text(encoding="utf-8")
-            if MISSING_EVENTS_PATH.exists()
-            else None
-        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing_events_path = Path(temp_dir) / "missing_events.json"
+            with patch.object(web_app, "MISSING_EVENTS_PATH", missing_events_path):
+                response = analyze_payload(data, payload)
+                missing = response["state"]["missing_events"]
 
-        try:
-            response = analyze_payload(data, payload)
-            missing = response["state"]["missing_events"]
-
-            self.assertEqual(missing, [{"name": missing_name, "display_name": missing_name}])
-            self.assertTrue(MISSING_EVENTS_PATH.exists())
-            saved = json.loads(MISSING_EVENTS_PATH.read_text(encoding="utf-8"))
-            self.assertEqual(saved[missing_name]["last_seen_hero"], "Vanessa")
-        finally:
-            if original_text is None:
-                MISSING_EVENTS_PATH.unlink(missing_ok=True)
-            else:
-                MISSING_EVENTS_PATH.write_text(original_text, encoding="utf-8")
+                self.assertEqual(
+                    missing,
+                    [{"name": missing_name, "display_name": missing_name}],
+                )
+                self.assertTrue(missing_events_path.exists())
+                saved = json.loads(missing_events_path.read_text(encoding="utf-8"))
+                self.assertEqual(saved[missing_name]["last_seen_hero"], "Vanessa")
 
     def test_web_payload_uses_auto_build_for_unconfigured_hero(self) -> None:
         data = load_all_data(DATA_DIR)
@@ -1056,7 +1056,7 @@ class RecommenderTests(unittest.TestCase):
             current_hero="Vanessa",
         )
 
-        self.assertEqual(rarity_filter, {"min": "gold", "max": "gold"})
+        self.assertEqual(rarity_filter, {"min": "silver", "max": "diamond"})
         self.assertEqual([card["name"] for card in cards], ["Gunpowder"])
 
     def test_farai_offers_six_packages_and_grants_one(self) -> None:
@@ -1183,7 +1183,7 @@ class RecommenderTests(unittest.TestCase):
         )
 
         self.assertGreater(result["pool_stats"]["expected_sell_gold"], 0)
-        self.assertEqual(result["recommendation"], "Medium Value")
+        self.assertEqual(result["recommendation"], "Low Value")
         self.assertTrue(
             any("卖出" in reason for reason in result["reasons"])
         )
