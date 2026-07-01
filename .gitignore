@@ -63,3 +63,13 @@ Desktop.ini
 *.zip
 *.rar
 *.7z
+
+# release artifacts
+release/
+releases/
+dist/
+build/
+*.zip
+*.7z
+*.rar
+*.log
