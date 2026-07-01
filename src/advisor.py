@@ -48,6 +48,8 @@ def analyze_game_state(data: dict, state: GameState, top: int | None = None) -> 
                 owned_cards=state.owned_cards,
                 owned_card_enchantments=state.owned_card_enchantments,
                 all_builds=data["builds"],
+                current_shop=state.current_shop,
+                current_gold=state.gold,
             )
         )
 

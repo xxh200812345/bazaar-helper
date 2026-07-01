@@ -75,10 +75,25 @@ namespace BazaarStateExporter
             json.Property("event_option_ids", snapshot.event_option_ids);
             json.Property("event_option_template_ids", snapshot.event_option_template_ids);
             json.Property("event_options_detailed", snapshot.event_options_detailed);
+            json.Property("current_events", snapshot.current_events);
             json.Property("owned_cards", snapshot.owned_cards);
             json.Property("visible_cards", snapshot.visible_cards);
+            json.Property("owned_items", snapshot.owned_items);
+            json.Property("board_items", snapshot.board_items);
+            json.Property("stash_items", snapshot.stash_items);
+            json.Property("skills", snapshot.skills);
+            json.Property("current_reward_options", snapshot.current_reward_options);
+            json.Property("current_shop", snapshot.current_shop);
             json.Property("gold", snapshot.gold);
             json.Property("health", snapshot.health);
+            json.Property("combat_health", snapshot.combat_health);
+            json.Property("income", snapshot.income);
+            json.Property("level", snapshot.level);
+            json.Property("xp", snapshot.xp);
+            json.Property("prestige", snapshot.prestige);
+            json.Property("max_prestige", snapshot.max_prestige);
+            json.Property("inventory_slots_used", snapshot.inventory_slots_used);
+            json.Property("inventory_slots_total", snapshot.inventory_slots_total);
             json.EndObject();
             json.NewLine();
             return json.ToString();
@@ -137,6 +152,37 @@ namespace BazaarStateExporter
                 }
             }
 
+            public void Property(string name, bool? value)
+            {
+                WritePropertyName(name);
+                builder.Append(value.HasValue
+                    ? (value.Value ? "true" : "false")
+                    : "null");
+            }
+
+            public void Property(string name, CurrentShopSnapshot shop)
+            {
+                WritePropertyName(name);
+                if (shop == null)
+                {
+                    builder.Append("null");
+                    return;
+                }
+
+                builder.Append('{');
+                WriteInlinePropertyName("visible_items", false);
+                WriteCards(shop.visible_items);
+                WriteInlinePropertyName("refresh_available", true);
+                WriteNullableBool(shop.refresh_available);
+                WriteInlinePropertyName("refresh_cost", true);
+                WriteNullableInt(shop.refresh_cost);
+                WriteInlinePropertyName("refreshes_used", true);
+                WriteNullableInt(shop.refreshes_used);
+                WriteInlinePropertyName("refreshes_remaining", true);
+                WriteNullableInt(shop.refreshes_remaining);
+                builder.Append('}');
+            }
+
             public void Property(string name, List<string> values)
             {
                 WritePropertyName(name);
@@ -155,8 +201,13 @@ namespace BazaarStateExporter
             public void Property(string name, List<CardSnapshot> cards)
             {
                 WritePropertyName(name);
+                WriteCards(cards);
+            }
+
+            private void WriteCards(List<CardSnapshot> cards)
+            {
                 builder.Append('[');
-                for (int i = 0; i < cards.Count; i++)
+                for (int i = 0; cards != null && i < cards.Count; i++)
                 {
                     if (i > 0)
                     {
@@ -165,6 +216,30 @@ namespace BazaarStateExporter
                     WriteCard(cards[i]);
                 }
                 builder.Append(']');
+            }
+
+            private void WriteInlinePropertyName(string name, bool comma)
+            {
+                if (comma)
+                {
+                    builder.Append(',');
+                }
+                WriteString(name);
+                builder.Append(':');
+            }
+
+            private void WriteNullableInt(int? value)
+            {
+                builder.Append(value.HasValue
+                    ? value.Value.ToString(CultureInfo.InvariantCulture)
+                    : "null");
+            }
+
+            private void WriteNullableBool(bool? value)
+            {
+                builder.Append(value.HasValue
+                    ? (value.Value ? "true" : "false")
+                    : "null");
             }
             public void Property(string name, List<EventOptionSnapshot> options)
             {
@@ -218,6 +293,18 @@ namespace BazaarStateExporter
                 WriteOptionalCardProperty("section", card.section, ref wrote);
                 WriteOptionalCardProperty("card_type", card.card_type, ref wrote);
                 WriteOptionalCardProperty("source", card.source, ref wrote);
+                WriteOptionalCardProperty("ui_context", card.ui_context, ref wrote);
+                if (card.price.HasValue)
+                {
+                    if (wrote)
+                    {
+                        builder.Append(',');
+                    }
+                    WriteString("price");
+                    builder.Append(':');
+                    builder.Append(card.price.Value.ToString(CultureInfo.InvariantCulture));
+                    wrote = true;
+                }
                 if (card.enchantments != null && card.enchantments.Count > 0)
                 {
                     if (wrote)

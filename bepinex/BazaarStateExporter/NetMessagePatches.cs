@@ -12,6 +12,8 @@ namespace BazaarStateExporter
 {
     public static class RuntimeStateCache
     {
+        public const string ScreenModeEvents = "events";
+        public const string ScreenModeShop = "shop";
         public static ManualLogSource Logger;
         public static object LatestGameStateSnapshot;
         public static object NetMessageProcessor;
@@ -19,6 +21,12 @@ namespace BazaarStateExporter
         public static int? LatestHealth;
         public static float LastResourceUpdateAt;
         public static string LastResourceSource;
+        public static bool? ShopRefreshAvailable;
+        public static int? ShopRefreshCost;
+        public static int? ShopRefreshesRemaining;
+        public static string CurrentScreenMode;
+        public static float LastScreenModeAt;
+        private static string LastLoggedShopRefresh;
         private static readonly object ResourcesLock = new object();
         private static readonly object CapturedCardsLock = new object();
         private static readonly Dictionary<string, CapturedCardEntry> CapturedCardsByInstanceId = new Dictionary<string, CapturedCardEntry>();
@@ -81,6 +89,11 @@ namespace BazaarStateExporter
                 LatestHealth = null;
                 LastResourceUpdateAt = 0f;
                 LastResourceSource = null;
+                ShopRefreshAvailable = null;
+                ShopRefreshCost = null;
+                ShopRefreshesRemaining = null;
+                CurrentScreenMode = null;
+                LastScreenModeAt = 0f;
             }
 
             lock (CapturedCardsLock)
@@ -90,6 +103,72 @@ namespace BazaarStateExporter
             }
 
             Logger?.LogInfo("Cleared runtime resource and UI card caches for new run.");
+        }
+
+        public static void UpdateShopRefresh(
+            bool? available,
+            int? cost,
+            int? remaining)
+        {
+            ShopRefreshAvailable = available;
+            ShopRefreshCost = cost;
+            ShopRefreshesRemaining = remaining;
+            if (available.HasValue || cost.HasValue || remaining.HasValue)
+            {
+                SetScreenMode(ScreenModeShop, "reroll_state");
+            }
+            string signature =
+                (available.HasValue ? available.Value.ToString() : "null")
+                + "/"
+                + (cost.HasValue ? cost.Value.ToString() : "null")
+                + "/"
+                + (remaining.HasValue ? remaining.Value.ToString() : "null");
+            if (!string.Equals(LastLoggedShopRefresh, signature, StringComparison.Ordinal))
+            {
+                LastLoggedShopRefresh = signature;
+                Logger?.LogInfo(
+                    "Captured reroll state available="
+                    + (available.HasValue ? available.Value.ToString() : "null")
+                    + " cost="
+                    + (cost.HasValue ? cost.Value.ToString() : "null")
+                    + " remaining="
+                    + (remaining.HasValue ? remaining.Value.ToString() : "null"));
+            }
+        }
+
+        public static void ClearShopRefresh()
+        {
+            ShopRefreshAvailable = null;
+            ShopRefreshCost = null;
+            ShopRefreshesRemaining = null;
+            LastLoggedShopRefresh = null;
+        }
+
+        public static void SetScreenMode(string mode, string source)
+        {
+            if (string.IsNullOrEmpty(mode))
+            {
+                return;
+            }
+
+            bool changed = !string.Equals(CurrentScreenMode, mode, StringComparison.Ordinal);
+            CurrentScreenMode = mode;
+            LastScreenModeAt = Time.unscaledTime;
+            if (changed)
+            {
+                Logger?.LogInfo("Screen mode=" + mode + " source=" + source);
+            }
+        }
+
+        public static string GetScreenMode(float maxAgeSeconds)
+        {
+            if (string.IsNullOrEmpty(CurrentScreenMode))
+            {
+                return null;
+            }
+            return Time.unscaledTime - LastScreenModeAt <= maxAgeSeconds
+                ? CurrentScreenMode
+                : null;
         }
 
         public static bool RecordUiCard(CardSnapshot card)
@@ -106,7 +185,9 @@ namespace BazaarStateExporter
                     || existing.Card.name != card.name
                     || existing.Card.rarity != card.rarity
                     || existing.Card.section != card.section
-                    || existing.Card.card_type != card.card_type;
+                    || existing.Card.card_type != card.card_type
+                    || existing.Card.ui_context != card.ui_context
+                    || existing.Card.price != card.price;
 
                 CapturedCardsByInstanceId[card.id] = new CapturedCardEntry
                 {
@@ -119,6 +200,13 @@ namespace BazaarStateExporter
 
         public static List<CardSnapshot> GetCapturedUiCards(float maxAgeSeconds)
         {
+            return GetCapturedUiCards(maxAgeSeconds, 0f);
+        }
+
+        public static List<CardSnapshot> GetCapturedUiCards(
+            float maxAgeSeconds,
+            float minSeenAt)
+        {
             float now = Time.unscaledTime;
             List<string> expired = new List<string>();
             List<CardSnapshot> result = new List<CardSnapshot>();
@@ -128,7 +216,10 @@ namespace BazaarStateExporter
                 {
                     if (now - item.Value.LastSeenAt <= maxAgeSeconds)
                     {
-                        result.Add(item.Value.Card);
+                        if (item.Value.LastSeenAt >= minSeenAt)
+                        {
+                            result.Add(item.Value.Card);
+                        }
                     }
                     else
                     {
@@ -143,6 +234,52 @@ namespace BazaarStateExporter
             }
 
             return result;
+        }
+
+        public static List<CardSnapshot> GetLatestOpponentItemSocketCards(
+            float maxAgeSeconds)
+        {
+            return GetLatestOpponentItemSocketCards(maxAgeSeconds, 0f);
+        }
+
+        public static List<CardSnapshot> GetLatestOpponentItemSocketCards(
+            float maxAgeSeconds,
+            float minSeenAt)
+        {
+            float now = Time.unscaledTime;
+            Dictionary<string, CapturedCardEntry> latestBySocket =
+                new Dictionary<string, CapturedCardEntry>();
+            lock (CapturedCardsLock)
+            {
+                foreach (CapturedCardEntry entry in CapturedCardsByInstanceId.Values)
+                {
+                    CardSnapshot card = entry.Card;
+                    string context = card == null ? "" : card.ui_context ?? "";
+                    int start = context.IndexOf(
+                        "OpponentItemSocket_",
+                        StringComparison.OrdinalIgnoreCase);
+                    if (start < 0
+                        || now - entry.LastSeenAt > maxAgeSeconds
+                        || entry.LastSeenAt < minSeenAt)
+                    {
+                        continue;
+                    }
+                    int end = context.IndexOf('/', start);
+                    string socket = end < 0
+                        ? context.Substring(start)
+                        : context.Substring(start, end - start);
+                    CapturedCardEntry existing;
+                    if (!latestBySocket.TryGetValue(socket, out existing)
+                        || entry.LastSeenAt > existing.LastSeenAt)
+                    {
+                        latestBySocket[socket] = entry;
+                    }
+                }
+            }
+            return latestBySocket
+                .OrderBy(item => item.Key)
+                .Select(item => item.Value.Card)
+                .ToList();
         }
 
         public static void SetCurrentVisibleCards(List<CardSnapshot> cards)
@@ -528,6 +665,140 @@ namespace BazaarStateExporter
     }
 
     [HarmonyPatch]
+    public static class RerollButtonPatch
+    {
+        public static IEnumerable<MethodBase> TargetMethods()
+        {
+            Type type = AccessTools.TypeByName("TheBazaar.RerollButton");
+            if (type == null)
+            {
+                return Enumerable.Empty<MethodBase>();
+            }
+            return new[] { "OnEnable", "OnDisable", "UpdateView", "OnRerollCostChanged" }
+                .Select(name => AccessTools.Method(type, name))
+                .Where(method => method != null)
+                .Cast<MethodBase>()
+                .ToArray();
+        }
+
+        public static void Postfix(object __instance, MethodBase __originalMethod)
+        {
+            if (__originalMethod != null && __originalMethod.Name == "OnDisable")
+            {
+                RuntimeStateCache.ClearShopRefresh();
+                Plugin.RequestEventExport();
+                return;
+            }
+            Type type = __instance.GetType();
+            bool? enabled = ReadBool(type, __instance, "IsEnabled");
+            bool? canInteract = InvokeBool(type, __instance, "CanInteract");
+            bool? canAfford = InvokeBool(type, __instance, "CanAffordReroll");
+            RuntimeStateCache.UpdateShopRefresh(
+                CombineAvailable(enabled, canInteract, canAfford),
+                ReadInt(type, __instance, "_rerollCost"),
+                ReadInt(type, __instance, "_rerollsRemaining"));
+            Plugin.RequestEventExport();
+        }
+
+        private static int? ReadInt(Type type, object instance, string name)
+        {
+            PropertyInfo property = AccessTools.Property(type, name);
+            object value = property == null ? null : property.GetValue(instance, null);
+            if (value == null)
+            {
+                return null;
+            }
+            try
+            {
+                return Convert.ToInt32(value);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static bool? ReadBool(Type type, object instance, string name)
+        {
+            PropertyInfo property = AccessTools.Property(type, name);
+            object value = property == null ? null : property.GetValue(instance, null);
+            return value is bool ? (bool?)value : null;
+        }
+
+        private static bool? InvokeBool(Type type, object instance, string name)
+        {
+            MethodInfo method = AccessTools.Method(type, name);
+            if (method == null || method.GetParameters().Length != 0)
+            {
+                return null;
+            }
+            try
+            {
+                object value = method.Invoke(instance, null);
+                return value is bool ? (bool?)value : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static bool? CombineAvailable(params bool?[] values)
+        {
+            if (values.Any(value => value == false))
+            {
+                return false;
+            }
+            return values.Any(value => value.HasValue) ? (bool?)true : null;
+        }
+    }
+
+    [HarmonyPatch]
+    public static class CardControllerUpdatePriceTagPatch
+    {
+        public static MethodBase TargetMethod()
+        {
+            Type type = AccessTools.TypeByName("CardController");
+            return type == null ? null : AccessTools.Method(type, "UpdatePriceTag");
+        }
+
+        public static void Postfix(object __instance)
+        {
+            UiCardCapture.TryCapture(__instance, "update_price_tag");
+        }
+    }
+
+    [HarmonyPatch]
+    public static class CardControllerOnEnablePatch
+    {
+        public static MethodBase TargetMethod()
+        {
+            Type type = AccessTools.TypeByName("CardController");
+            return type == null ? null : AccessTools.Method(type, "OnEnable");
+        }
+
+        public static void Postfix(object __instance)
+        {
+            UiCardCapture.TryCapture(__instance, "on_enable");
+        }
+    }
+
+    [HarmonyPatch]
+    public static class CardControllerSetCardDataPatch
+    {
+        public static MethodBase TargetMethod()
+        {
+            Type type = AccessTools.TypeByName("CardController");
+            return type == null ? null : AccessTools.Method(type, "SetCardData");
+        }
+
+        public static void Postfix(object __instance)
+        {
+            UiCardCapture.TryCapture(__instance, "set_card_data");
+        }
+    }
+
+    [HarmonyPatch]
     public static class CardControllerShowCardPatch
     {
         public static MethodBase TargetMethod()
@@ -614,6 +885,21 @@ namespace BazaarStateExporter
             {
                 CardSnapshot card = TryBuildSnapshot(controller, source);
                 bool changed = RuntimeStateCache.RecordUiCard(card);
+                if (IsCurrentEventOptionCard(card))
+                {
+                    RuntimeStateCache.ClearShopRefresh();
+                    RuntimeStateCache.SetScreenMode(
+                        RuntimeStateCache.ScreenModeEvents,
+                        source);
+                    changed = true;
+                }
+                else if (IsShopOfferCard(card))
+                {
+                    RuntimeStateCache.SetScreenMode(
+                        RuntimeStateCache.ScreenModeShop,
+                        source);
+                    changed = true;
+                }
                 if (RuntimeStateCache.LatestGameStateSnapshot == null)
                 {
                     object dto = StateProbe.TryRecoverInitialGameState();
@@ -624,7 +910,10 @@ namespace BazaarStateExporter
                             "Recovered initial game state after first live card event.");
                     }
                 }
-                Plugin.RequestEventExport();
+                if (changed)
+                {
+                    Plugin.RequestEventExport();
+                }
                 if (changed && card != null && !string.IsNullOrEmpty(card.id))
                 {
                     RuntimeStateCache.Logger?.LogInfo(
@@ -639,13 +928,63 @@ namespace BazaarStateExporter
                         + " type="
                         + card.card_type
                         + " section="
-                        + card.section);
+                        + card.section
+                        + " context="
+                        + card.ui_context);
                 }
             }
             catch (Exception ex)
             {
                 RuntimeStateCache.Logger?.LogDebug("UI card capture failed: " + ex.Message);
             }
+        }
+
+        private static bool IsCurrentEventOptionCard(CardSnapshot card)
+        {
+            if (card == null || string.IsNullOrEmpty(card.id))
+            {
+                return false;
+            }
+
+            string cardType = card.card_type ?? "";
+            bool eventEncounter = cardType.IndexOf(
+                    "EventEncounter",
+                    StringComparison.OrdinalIgnoreCase) >= 0
+                || card.id.StartsWith("enc_", StringComparison.OrdinalIgnoreCase);
+            if (!eventEncounter)
+            {
+                return false;
+            }
+
+            string context = card.ui_context ?? "";
+            return context.IndexOf("Merchant", StringComparison.OrdinalIgnoreCase) < 0
+                && context.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
+        private static bool IsShopOfferCard(CardSnapshot card)
+        {
+            if (card == null
+                || string.IsNullOrEmpty(card.id)
+                || !string.Equals(card.card_type, "Item", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string section = card.section ?? "";
+            string context = card.ui_context ?? "";
+            if (section.IndexOf("Reward", StringComparison.OrdinalIgnoreCase) >= 0
+                || section.IndexOf("Selection", StringComparison.OrdinalIgnoreCase) >= 0
+                || string.Equals(section, "Hand", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(section, "Stash", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return section.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0
+                || context.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0
+                || context.IndexOf("Merchant", StringComparison.OrdinalIgnoreCase) >= 0
+                || context.IndexOf("OpponentItemSocket_", StringComparison.OrdinalIgnoreCase) >= 0
+                || context.IndexOf("OpponentPortraitSocketMerchant", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static CardSnapshot BuildCardSnapshot(object controller, string source)
@@ -666,6 +1005,8 @@ namespace BazaarStateExporter
                 section = StringValue(GetProperty(cardData, "Section")),
                 card_type = StringValue(GetProperty(cardData, "Type")),
                 source = source,
+                ui_context = GetUiContext(controller),
+                price = GetCurrentPrice(controller),
             };
 
             if (HasValue(enchantment))
@@ -674,6 +1015,48 @@ namespace BazaarStateExporter
             }
 
             return card;
+        }
+
+        private static int? GetCurrentPrice(object controller)
+        {
+            object priceContainer = GetProperty(controller, "ActivePriceContainer");
+            if (priceContainer == null)
+            {
+                return null;
+            }
+            FieldInfo currentPriceField = priceContainer.GetType().GetField(
+                "currentPrice",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            object textComponent = currentPriceField == null
+                ? null
+                : currentPriceField.GetValue(priceContainer);
+            object rawText = GetProperty(textComponent, "text");
+            string text = StringValue(rawText);
+            if (string.IsNullOrEmpty(text))
+            {
+                return null;
+            }
+            string digits = new string(text.Where(char.IsDigit).ToArray());
+            int value;
+            return int.TryParse(digits, out value) ? (int?)value : null;
+        }
+
+        private static string GetUiContext(object controller)
+        {
+            Component component = controller as Component;
+            if (component == null || component.transform == null)
+            {
+                return null;
+            }
+
+            List<string> names = new List<string>();
+            Transform current = component.transform;
+            for (int depth = 0; current != null && depth < 12; depth++)
+            {
+                names.Add(current.name ?? "");
+                current = current.parent;
+            }
+            return string.Join("/", names.ToArray());
         }
 
         private static object GetProperty(object target, string name)

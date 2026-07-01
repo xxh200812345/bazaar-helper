@@ -761,6 +761,30 @@ class RecommenderTests(unittest.TestCase):
         self.assertEqual(normalized["event_options"], ["Colt"])
         self.assertFalse(response["warnings"])
 
+    def test_structured_shop_items_never_fall_back_to_event_options(self) -> None:
+        data = load_all_data(DATA_DIR)
+        payload = {
+            "source": "bepinex",
+            "hero": "Vanessa",
+            "day": 6,
+            "event_option_ids": ["itm_offer_1"],
+            "event_option_template_ids": [
+                "096e4b73-803c-4405-9710-db71b20fb183"
+            ],
+            "event_options_detailed": [
+                {
+                    "id": "itm_offer_1",
+                    "template_id": "096e4b73-803c-4405-9710-db71b20fb183",
+                    "kind": "unknown",
+                    "card_type": "Item",
+                }
+            ],
+        }
+
+        normalized = normalize_payload_for_analysis(data, payload)
+
+        self.assertEqual(normalized["event_options"], [])
+
     def test_web_payload_limits_stale_event_history_to_current_instances(self) -> None:
         data = load_all_data(DATA_DIR)
         payload = {

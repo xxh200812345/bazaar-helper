@@ -20,8 +20,26 @@ class GameState:
     owned_card_enchantments: dict[str, list[str]] = field(default_factory=dict)
     visible_cards: list[str] = field(default_factory=list)
     gold: int | None = None
-    health: int | None = None
+    combat_health: int | None = None
+    prestige: int | None = None
+    max_prestige: int | None = None
+    income: int | None = None
+    level: int | None = None
+    xp: int | None = None
+    owned_items: list[dict[str, Any]] | None = None
+    board_items: list[dict[str, Any]] | None = None
+    stash_items: list[dict[str, Any]] | None = None
+    skills: list[dict[str, Any]] | None = None
+    current_events: list[dict[str, Any]] | None = None
+    current_shop: dict[str, Any] | None = None
+    current_reward_options: list[dict[str, Any]] | None = None
+    inventory_slots_used: int | None = None
+    inventory_slots_total: int | None = None
     source: str = "manual"
+
+    @property
+    def health(self) -> int | None:
+        return self.combat_health
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "GameState":
@@ -55,6 +73,16 @@ class GameState:
                 for item in visible_cards
             ]
 
+        raw_entries = payload.get("owned_cards")
+        entries = (
+            [dict(item) for item in raw_entries if isinstance(item, dict)]
+            if isinstance(raw_entries, list)
+            else None
+        )
+        current_shop = payload.get("current_shop")
+        if not isinstance(current_shop, dict):
+            current_shop = None
+
         return cls(
             hero=str(payload["hero"]),
             build=str(payload["build"]),
@@ -64,7 +92,21 @@ class GameState:
             owned_card_enchantments=owned_card_enchantments,
             visible_cards=[str(name) for name in visible_cards if name],
             gold=_optional_int(payload.get("gold")),
-            health=_optional_int(payload.get("health")),
+            combat_health=_optional_int(payload.get("combat_health", payload.get("health"))),
+            prestige=_optional_int(payload.get("prestige")),
+            max_prestige=_optional_int(payload.get("max_prestige")),
+            income=_optional_int(payload.get("income")),
+            level=_optional_int(payload.get("level")),
+            xp=_optional_int(payload.get("xp")),
+            owned_items=_optional_list(payload.get("owned_items", _items(entries))),
+            board_items=_optional_list(payload.get("board_items", _by_section(entries, {"hand", "board"}))),
+            stash_items=_optional_list(payload.get("stash_items", _by_section(entries, {"stash"}))),
+            skills=_optional_list(payload.get("skills", _by_type(entries, "skill"))),
+            current_events=_optional_list(payload.get("current_events")),
+            current_shop=dict(current_shop) if current_shop is not None else None,
+            current_reward_options=_optional_list(payload.get("current_reward_options")),
+            inventory_slots_used=_optional_int(payload.get("inventory_slots_used")),
+            inventory_slots_total=_optional_int(payload.get("inventory_slots_total")),
             source=str(payload.get("source", "manual")),
         )
 
@@ -126,6 +168,40 @@ def _optional_int(value: Any) -> int | None:
     if value in (None, ""):
         return None
     return int(value)
+
+
+def _optional_list(value: Any) -> list[dict[str, Any]] | None:
+    if value is None or not isinstance(value, list):
+        return None
+    return [dict(item) for item in value if isinstance(item, dict)]
+
+
+def _by_section(entries: list[dict[str, Any]] | None, sections: set[str]) -> list[dict[str, Any]] | None:
+    if entries is None:
+        return None
+    return [
+        item for item in entries
+        if str(item.get("card_type", "item")).lower() != "skill"
+        and str(item.get("section", "")).lower() in sections
+    ]
+
+
+def _by_type(entries: list[dict[str, Any]] | None, card_type: str) -> list[dict[str, Any]] | None:
+    if entries is None:
+        return None
+    return [
+        item for item in entries
+        if str(item.get("card_type", "")).lower() == card_type.lower()
+    ]
+
+
+def _items(entries: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+    if entries is None:
+        return None
+    return [
+        item for item in entries
+        if str(item.get("card_type", "item")).lower() != "skill"
+    ]
 
 
 def _event_available_for_hero(event_data: dict[str, Any], hero: str) -> bool:

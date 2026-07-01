@@ -7,7 +7,28 @@ cd /d "%~dp0"
 set "DLL_SRC=%~dp0bepinex_plugin\BazaarStateExporter.dll"
 set "OUTPUT_PATH=%LOCALAPPDATA%\BazaarHelper\runtime\game_state.json"
 
+if "%LOCALAPPDATA%"=="" (
+    echo ERROR: LOCALAPPDATA is not available.
+    pause
+    exit /b 1
+)
+
 if not exist "%LOCALAPPDATA%\BazaarHelper\runtime" mkdir "%LOCALAPPDATA%\BazaarHelper\runtime"
+if not exist "%LOCALAPPDATA%\BazaarHelper\runtime" (
+    echo ERROR: Cannot create runtime directory:
+    echo %LOCALAPPDATA%\BazaarHelper\runtime
+    pause
+    exit /b 1
+)
+
+> "%LOCALAPPDATA%\BazaarHelper\runtime\.write_test" echo ok
+if errorlevel 1 (
+    echo ERROR: Runtime directory is not writable:
+    echo %LOCALAPPDATA%\BazaarHelper\runtime
+    pause
+    exit /b 1
+)
+del /Q "%LOCALAPPDATA%\BazaarHelper\runtime\.write_test" >nul 2>nul
 
 if not exist "%DLL_SRC%" (
     echo 没找到插件 DLL：
@@ -56,6 +77,12 @@ copy /Y "%DLL_SRC%" "%PLUGIN_DIR%\BazaarStateExporter.dll" >nul
 >> "%CONFIG_FILE%" echo [Debug]
 >> "%CONFIG_FILE%" echo WritePlaceholderWhenEmpty = false
 >> "%CONFIG_FILE%" echo EnableRuntimeInspection = false
+if errorlevel 1 (
+    echo ERROR: Cannot write plugin config:
+    echo %CONFIG_FILE%
+    pause
+    exit /b 1
+)
 
 echo.
 echo 安装完成。

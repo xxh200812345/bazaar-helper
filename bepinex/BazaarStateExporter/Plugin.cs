@@ -13,11 +13,13 @@ namespace BazaarStateExporter
     {
         public const string PluginGuid = "local.bazaar.stateexporter";
         public const string PluginName = "Bazaar State Exporter";
-        public const string PluginVersion = "0.6.0";
+        public const string PluginVersion = "0.7.9";
 
         private ConfigEntry<string> outputPath;
         private ConfigEntry<float> pollIntervalSeconds;
         private ConfigEntry<bool> writePlaceholderWhenEmpty;
+        private ConfigEntry<bool> enableVisibleCardScanning;
+        private ConfigEntry<bool> enableUnsafeUiScanning;
         private StateProbe probe;
         private Harmony harmony;
         private float nextPollAt;
@@ -35,6 +37,12 @@ namespace BazaarStateExporter
                 "OutputPath",
                 defaultOutputPath,
                 "Absolute path to the shared JSON file consumed by BazaarHelper.");
+            string resolvedOutputPath = ResolveOutputPath(outputPath.Value, defaultOutputPath);
+            if (!string.Equals(outputPath.Value, resolvedOutputPath, StringComparison.Ordinal))
+            {
+                outputPath.Value = resolvedOutputPath;
+                Config.Save();
+            }
             pollIntervalSeconds = Config.Bind(
                 "Export",
                 "PollIntervalSeconds",
@@ -45,8 +53,18 @@ namespace BazaarStateExporter
                 "WritePlaceholderWhenEmpty",
                 false,
                 "Write a sample Vanessa state if the live probe has not been implemented or cannot find game objects.");
+            enableVisibleCardScanning = Config.Bind(
+                "Export",
+                "EnableVisibleCardScanning",
+                true,
+                "Automatically scan visible CardController objects so event/shop screens update without mouse hover.");
+            enableUnsafeUiScanning = Config.Bind(
+                "Debug",
+                "EnableUnsafeUiScanning",
+                false,
+                "Enable extra global HUD resource scans. Disabled by default because these scans can destabilize the game.");
             probe = new StateProbe(Logger);
-            EventDrivenExporter.Initialize(probe, outputPath.Value, Logger);
+            EventDrivenExporter.Initialize(probe, resolvedOutputPath, Logger);
             RuntimeStateCache.Logger = Logger;
             try
             {
@@ -63,7 +81,38 @@ namespace BazaarStateExporter
                 + " "
                 + PluginVersion
                 + " loaded with event-driven export. OutputPath="
-                + outputPath.Value);
+                + resolvedOutputPath);
+        }
+
+        private string ResolveOutputPath(string configuredPath, string defaultOutputPath)
+        {
+            string candidate = string.IsNullOrWhiteSpace(configuredPath)
+                ? defaultOutputPath
+                : configuredPath;
+            try
+            {
+                string fullPath = Path.GetFullPath(
+                    Environment.ExpandEnvironmentVariables(candidate));
+                string directory = Path.GetDirectoryName(fullPath);
+                if (string.IsNullOrEmpty(directory))
+                {
+                    throw new IOException("OutputPath has no parent directory.");
+                }
+                Directory.CreateDirectory(directory);
+                return fullPath;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(
+                    "Configured OutputPath is invalid or unavailable: "
+                    + candidate
+                    + ". Falling back to "
+                    + defaultOutputPath
+                    + ". Error: "
+                    + ex.Message);
+                Directory.CreateDirectory(Path.GetDirectoryName(defaultOutputPath));
+                return defaultOutputPath;
+            }
         }
 
         private void OnDestroy()
@@ -95,8 +144,14 @@ namespace BazaarStateExporter
 
             try
             {
-                probe.ScanVisibleUiCards();
-                probe.ScanUiResources();
+                if (enableVisibleCardScanning.Value)
+                {
+                    probe.ScanVisibleUiCards();
+                }
+                if (enableUnsafeUiScanning.Value)
+                {
+                    probe.ScanUiResources();
+                }
                 GameStateSnapshot snapshot = probe.TryReadCurrentState();
                 if (snapshot == null && writePlaceholderWhenEmpty.Value)
                 {

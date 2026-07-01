@@ -12,10 +12,25 @@ namespace BazaarStateExporter
         public List<string> event_option_ids = new List<string>();
         public List<string> event_option_template_ids = new List<string>();
         public List<EventOptionSnapshot> event_options_detailed = new List<EventOptionSnapshot>();
+        public List<EventOptionSnapshot> current_events = new List<EventOptionSnapshot>();
         public List<CardSnapshot> owned_cards = new List<CardSnapshot>();
         public List<CardSnapshot> visible_cards = new List<CardSnapshot>();
+        public List<CardSnapshot> owned_items = new List<CardSnapshot>();
+        public List<CardSnapshot> board_items = new List<CardSnapshot>();
+        public List<CardSnapshot> stash_items = new List<CardSnapshot>();
+        public List<CardSnapshot> skills = new List<CardSnapshot>();
+        public List<CardSnapshot> current_reward_options = new List<CardSnapshot>();
+        public CurrentShopSnapshot current_shop;
         public int? gold;
         public int? health;
+        public int? combat_health;
+        public int? income;
+        public int? level;
+        public int? xp;
+        public int? prestige;
+        public int? max_prestige;
+        public int? inventory_slots_used;
+        public int? inventory_slots_total;
 
         public static GameStateSnapshot CreatePlaceholder()
         {
@@ -40,6 +55,15 @@ namespace BazaarStateExporter
         }
     }
 
+    public sealed class CurrentShopSnapshot
+    {
+        public List<CardSnapshot> visible_items = new List<CardSnapshot>();
+        public bool? refresh_available;
+        public int? refresh_cost;
+        public int? refreshes_used;
+        public int? refreshes_remaining;
+    }
+
     public sealed class EventOptionSnapshot
     {
         public string id;
@@ -60,6 +84,8 @@ namespace BazaarStateExporter
         public string section;
         public string card_type;
         public string source;
+        public string ui_context;
+        public int? price;
         public List<string> enchantments = new List<string>();
     }
 }

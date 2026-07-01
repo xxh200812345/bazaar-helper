@@ -172,6 +172,8 @@ def compact_recommendations(
     owned_cards: dict[str, str],
     results: list[dict[str, Any]],
     current_gold: int | None = None,
+    current_shop: dict[str, Any] | None = None,
+    build_analysis: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     build_data = data["builds"][build_name]
 
@@ -189,6 +191,26 @@ def compact_recommendations(
         "后续选择规则": "如果某个事件有后续选项，表示选择父事件后只能从后续子事件中选择一个；不能把多个子事件收益相加，也不能把子事件收益当作父事件直接收益。",
         "选项": [],
     }
+
+    if current_shop is not None:
+        refresh_cost = current_shop.get("refresh_cost")
+        payload["shop_facts"] = {
+            "visible_items": current_shop.get("visible_items"),
+            "refresh_available": current_shop.get("refresh_available"),
+            "refresh_cost": refresh_cost,
+            "gold_sufficient_for_refresh": (
+                current_gold >= refresh_cost
+                if isinstance(current_gold, int) and isinstance(refresh_cost, int)
+                else None
+            ),
+        }
+        payload["shop_decisions"] = [
+            result.get("shop_decision")
+            for result in results
+            if result.get("shop_decision") is not None
+        ]
+    if build_analysis is not None:
+        payload["stage_build_facts"] = build_analysis
 
     for result in results:
         event_name = result.get("event_name")

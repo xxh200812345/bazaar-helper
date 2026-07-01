@@ -17,6 +17,7 @@ from build_strategy import applicable_build_names, build_applies_to_day, get_gam
 from data_loader import load_all_data
 from game_state import GameState
 from app_paths import get_app_root, get_runtime_dir
+from stage_build_matcher import analyze_stage_builds
 
 
 BASE_DIR = get_app_root()
@@ -253,6 +254,27 @@ def normalize_payload_for_analysis(
     normalized["event_options"] = normalize_event_options(data, normalized)
     normalized["owned_cards"] = normalize_card_entries(data, normalized.get("owned_cards", []))
     normalized["visible_cards"] = normalize_card_entries(data, normalized.get("visible_cards", []))
+    for field_name in (
+        "owned_items",
+        "board_items",
+        "stash_items",
+        "skills",
+        "current_reward_options",
+    ):
+        normalized[field_name] = normalize_card_entries(
+            data, normalized.get(field_name)
+        )
+    if normalized.get("inventory_slots_used") is None:
+        normalized["inventory_slots_used"] = inventory_slots_used(
+            data, normalized.get("board_items")
+        )
+    current_shop = normalized.get("current_shop")
+    if isinstance(current_shop, dict):
+        current_shop = dict(current_shop)
+        current_shop["visible_items"] = normalize_card_entries(
+            data, current_shop.get("visible_items")
+        )
+        normalized["current_shop"] = current_shop
     hero = str(normalized.get("hero", ""))
     day = int(normalized.get("day", 1))
     normalized.pop("build", None)
@@ -266,6 +288,25 @@ def normalize_payload_for_analysis(
     normalized.setdefault("source", "runtime")
     normalized.setdefault("event_options", [])
     return normalized
+
+
+def inventory_slots_used(data: dict[str, Any], board_items: Any) -> int | None:
+    if not isinstance(board_items, list):
+        return None
+
+    size_slots = {"small": 1, "medium": 2, "large": 3}
+    total = 0
+    for item in board_items:
+        if not isinstance(item, dict) or not item.get("name"):
+            return None
+        card_data = data.get("cards", {}).get(str(item["name"]))
+        if not isinstance(card_data, dict):
+            return None
+        slots = size_slots.get(str(card_data.get("size", "")).lower())
+        if slots is None:
+            return None
+        total += slots
+    return total
 
 
 def normalize_event_options(data: dict[str, Any], payload: dict[str, Any]) -> list[str]:
@@ -307,6 +348,9 @@ def normalize_event_options(data: dict[str, Any], payload: dict[str, Any]) -> li
 
     # 新逻辑：优先使用插件导出的结构化事件选项。
     detailed_options = payload.get("event_options_detailed", [])
+    has_structured_detailed_options = (
+        isinstance(detailed_options, list) and bool(detailed_options)
+    )
     if isinstance(detailed_options, list):
         for option in detailed_options:
             if not is_detailed_encounter_option(option):
@@ -324,7 +368,7 @@ def normalize_event_options(data: dict[str, Any], payload: dict[str, Any]) -> li
                 candidates.append(option_id)
 
     # 旧逻辑兜底：如果没有 detailed，再用 template_id + instance_id。
-    if not candidates:
+    if not candidates and not has_structured_detailed_options:
         template_limit = len(raw_event_options) if raw_event_options else len(template_ids)
         for index, template_id in enumerate(template_ids[:template_limit]):
             instance_id = option_ids[index] if index < len(option_ids) else ""
@@ -790,9 +834,12 @@ def zh_text(data: dict[str, Any], text: Any) -> str:
 def display_card_entry(data: dict[str, Any], card: dict[str, Any]) -> dict[str, Any]:
     name = card.get("name") or ""
     template_id = card.get("template_id") or card.get("id")
+    rarity = card.get("rarity")
     return {
         **card,
         "display_name": zh_name(data, name, template_id),
+        "rarity": RARITY_LABELS_ZH.get(str(rarity).lower(), rarity) if rarity else rarity,
+        "card_type": display_card_type(data, card),
     }
 
 
@@ -802,9 +849,46 @@ def display_card_names(data: dict[str, Any], cards: dict[str, str]) -> list[dict
             "name": name,
             "display_name": zh_name(data, name),
             "rarity": RARITY_LABELS_ZH.get(str(rarity).lower(), rarity),
+            "card_type": display_card_type(data, {"name": name}),
         }
         for name, rarity in sorted(cards.items())
     ]
+
+
+def display_card_type(data: dict[str, Any], card: dict[str, Any]) -> str:
+    card_type = card.get("card_type") or card.get("type")
+    if card_type:
+        return str(card_type)
+
+    name = card.get("name")
+    card_data = data.get("cards", {}).get(str(name)) if name else None
+    if isinstance(card_data, dict):
+        return str(card_data.get("type") or "")
+    return ""
+
+
+def displayed_owned_groups(
+    data: dict[str, Any],
+    state: GameState,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    owned_items = (
+        [display_card_entry(data, item) for item in state.owned_items]
+        if isinstance(state.owned_items, list)
+        else []
+    )
+    skills = (
+        [display_card_entry(data, item) for item in state.skills]
+        if isinstance(state.skills, list)
+        else []
+    )
+    if owned_items or skills:
+        return owned_items, skills
+
+    all_owned = display_card_names(data, state.owned_cards)
+    return (
+        [card for card in all_owned if str(card.get("card_type", "")).lower() != "skill"],
+        [card for card in all_owned if str(card.get("card_type", "")).lower() == "skill"],
+    )
 
 
 def role_label(role: str | None) -> str:
@@ -1244,12 +1328,61 @@ def analyze_payload(
     if missing_events:
         record_missing_events(missing_events, state, payload)
     result = analyze_game_state(data, state, top=top)
+    actual_candidates: list[dict[str, Any]] = []
+    if isinstance(state.current_shop, dict):
+        visible_items = state.current_shop.get("visible_items")
+        if isinstance(visible_items, list):
+            actual_candidates.extend(
+                item for item in visible_items if isinstance(item, dict)
+            )
+    if isinstance(state.current_reward_options, list):
+        actual_candidates.extend(state.current_reward_options)
+    deduplicated_candidates: list[dict[str, Any]] = []
+    seen_candidates: set[str] = set()
+    for candidate in actual_candidates:
+        identity = str(
+            candidate.get("id")
+            or candidate.get("template_id")
+            or candidate.get("name")
+            or ""
+        )
+        if not identity or identity in seen_candidates:
+            continue
+        seen_candidates.add(identity)
+        deduplicated_candidates.append(candidate)
+    build_analysis = analyze_stage_builds(
+        data=data,
+        hero=state.hero,
+        day=state.day,
+        owned_cards=set(state.owned_cards),
+        candidates=deduplicated_candidates,
+        gold=state.gold,
+        prestige=state.prestige,
+        inventory_slots_used=state.inventory_slots_used,
+        inventory_slots_total=state.inventory_slots_total,
+        current_shop=state.current_shop,
+    )
+    for candidate in build_analysis.get("candidate_cards", []):
+        candidate["card_display_name"] = zh_name(
+            data, candidate.get("card_name")
+        )
+    for bundle in build_analysis.get("visible_core_bundles", []):
+        bundle["candidate_core_cards_display"] = [
+            zh_name(data, name)
+            for name in bundle.get("candidate_core_cards", [])
+        ]
+    owned_items_display, skills_display = displayed_owned_groups(data, state)
 
     response: dict[str, Any] = {
         "state": {
             "source": state.source,
             "hero": state.hero,
             "build": state.build,
+            "build_display_name": (
+                data.get("builds", {}).get(state.build, {}).get("name")
+                or data.get("builds", {}).get(state.build, {}).get("display_name")
+                or state.build
+            ),
             "day": state.day,
             "game_stage": get_game_stage_for_day(state.day),
             "game_stage_display": STAGE_LABELS_ZH.get(
@@ -1259,6 +1392,8 @@ def analyze_payload(
             "event_options": state.event_options,
             "owned_cards": state.owned_cards,
             "owned_cards_display": display_card_names(data, state.owned_cards),
+            "owned_items_display": owned_items_display,
+            "skills_display": skills_display,
             "owned_card_enchantments": state.owned_card_enchantments,
             "visible_cards": state.visible_cards,
             "visible_cards_display": [
@@ -1269,7 +1404,33 @@ def analyze_payload(
                 for name in state.visible_cards
             ],
             "gold": state.gold,
-            "health": state.health,
+            "health": state.combat_health,
+            "combat_health": state.combat_health,
+            "prestige": state.prestige,
+            "max_prestige": state.max_prestige,
+            "income": state.income,
+            "level": state.level,
+            "xp": state.xp,
+            "owned_items": state.owned_items,
+            "board_items": state.board_items,
+            "stash_items": state.stash_items,
+            "skills": state.skills,
+            "current_events": state.current_events,
+            "current_shop": (
+                {
+                    **state.current_shop,
+                    "visible_items": [
+                        display_card_entry(data, item)
+                        for item in state.current_shop.get("visible_items", [])
+                        if isinstance(item, dict)
+                    ],
+                }
+                if isinstance(state.current_shop, dict)
+                else None
+            ),
+            "current_reward_options": state.current_reward_options,
+            "inventory_slots_used": state.inventory_slots_used,
+            "inventory_slots_total": state.inventory_slots_total,
             "event_options_display": [
                 {
                     "name": name,
@@ -1291,9 +1452,13 @@ def analyze_payload(
             summarize_recommendation(data, item)
             for item in result.recommendations
         ],
+        "build_analysis": build_analysis,
     }
 
-    if include_ai and response["recommendations"]:
+    if include_ai and (
+        response["recommendations"]
+        or build_analysis.get("candidate_cards")
+    ):
         ai_results: list[dict[str, Any]] = []
 
         for raw_item, display_item in zip(result.recommendations, response["recommendations"]):
@@ -1320,6 +1485,8 @@ def analyze_payload(
             owned_cards=state.owned_cards,
             results=ai_results,
             current_gold=state.gold,
+            current_shop=state.current_shop,
+            build_analysis=build_analysis,
         )
         try:
             response["ai_analysis"] = analyze_with_ai(ai_payload)
@@ -1383,10 +1550,23 @@ class BazaarHandler(BaseHTTPRequestHandler):
                 self.send_json({"path": str(path), "payload": payload})
                 return
             if parsed.path == "/api/options":
+                build_options = [
+                    {
+                        "id": build_id,
+                        "name": (
+                            build_data.get("name")
+                            or build_data.get("display_name")
+                            or build_id
+                        ),
+                    }
+                    for build_id, build_data in sorted(self.data["builds"].items())
+                    if isinstance(build_data, dict)
+                ]
                 self.send_json(
                     {
                         "heroes": available_heroes(self.data),
                         "builds": sorted(self.data["builds"].keys()),
+                        "build_options": build_options,
                         "events": sorted(self.data["events"].keys()),
                     }
                 )
@@ -1576,6 +1756,10 @@ HTML_PAGE = r"""<!doctype html>
       color: var(--muted);
       white-space: nowrap;
     }
+    .list-item span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
     .event-list {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1643,12 +1827,16 @@ HTML_PAGE = r"""<!doctype html>
         <div class="metric"><span>天数</span><strong id="day">-</strong></div>
         <div class="metric"><span>金币</span><strong id="gold">-</strong></div>
         <div class="metric"><span>生命</span><strong id="health">-</strong></div>
+        <div class="metric"><span>声望</span><strong id="prestige">-</strong></div>
+        <div class="metric"><span>收入</span><strong id="income">-</strong></div>
       </div>
       <div class="metric"><span>阵容目标</span><strong id="build">-</strong><div class="muted" id="stage">-</div></div>
       <h2 class="panel-title">当前事件</h2>
       <div class="list" id="currentEvents"></div>
-      <h2 class="panel-title">已拥有</h2>
-      <div class="list" id="ownedCards"></div>
+      <h2 class="panel-title">已拥有物品</h2>
+      <div class="list" id="ownedItems"></div>
+      <h2 class="panel-title">已拥有技能</h2>
+      <div class="list" id="ownedSkills"></div>
       <h2 class="panel-title">当前可见卡</h2>
       <div class="list" id="visibleCards"></div>
     </aside>
@@ -1680,7 +1868,8 @@ HTML_PAGE = r"""<!doctype html>
       const data = await res.json();
       buildSelect.innerHTML = [
         `<option value="">自动匹配已有卡牌</option>`,
-        ...data.builds.map((name) => `<option value="${name}">${name}</option>`),
+        ...(data.build_options || data.builds.map((id) => ({ id, name: id })))
+          .map((build) => `<option value="${build.id}">${build.name}</option>`),
       ].join("");
       const savedBuild = localStorage.getItem("bazaar_selected_build");
       if (savedBuild === "") {
@@ -1733,7 +1922,9 @@ HTML_PAGE = r"""<!doctype html>
       document.querySelector("#day").textContent = state.day || "-";
       document.querySelector("#gold").textContent = state.gold ?? "-";
       document.querySelector("#health").textContent = state.health ?? "-";
-      document.querySelector("#build").textContent = state.build || "-";
+      document.querySelector("#prestige").textContent = formatPrestige(state);
+      document.querySelector("#income").textContent = state.income ?? "-";
+      document.querySelector("#build").textContent = state.build_display_name || state.build || "-";
       document.querySelector("#stage").textContent = state.game_stage_display || state.game_stage || "-";
       if (selectedBuild && state.build) buildSelect.value = state.build;
       renderStateLists(state);
@@ -1751,7 +1942,7 @@ HTML_PAGE = r"""<!doctype html>
         aiRequestInFlight = false;
       }
 
-      eventsEl.innerHTML = (data.recommendations || []).map((item) => {
+      const eventCards = (data.recommendations || []).map((item) => {
         const stats = item.pool_stats || {};
         const cards = (item.priority_cards || []).map((card) =>
           `<li>${card.display_name || card.name} <span class="muted">${card.tier || ""} ${card.role_label_zh || card.role || ""}</span></li>`
@@ -1794,6 +1985,33 @@ HTML_PAGE = r"""<!doctype html>
           </article>
         `;
       }).join("");
+
+      const buildAnalysis = data.build_analysis || {};
+      const shopCandidates = (buildAnalysis.candidate_cards || []).map((card) => {
+        const hits = (card.build_hits || []).map((hit) =>
+          `<li>${hit.build_name} · ${hit.build_phase} · ${hit.role} · ${hit.relation}</li>`
+        ).join("");
+        const reasons = (card.reasons || []).map((reason) => `<li>${reason}</li>`).join("");
+        const risks = (card.risks || []).map((risk) => `<li>${risk}</li>`).join("");
+        return `
+          <article class="event">
+            <h2>${card.card_display_name || card.card_name}<span class="badge ${card.importance === "medium" ? "medium" : card.importance === "low" || card.importance === "ignored" ? "low" : ""}">${card.importance}</span></h2>
+            <p><strong>${card.recommendation_type}</strong>${card.price != null ? ` · ${card.price}g` : " · 价格未知"}${card.affordable === true ? " · 买得起" : card.affordable === false ? " · 金币不足" : ""}</p>
+            <strong>Build 命中</strong>
+            <ul>${hits || "<li>未命中已维护 Build，不代表废卡</li>"}</ul>
+            <strong>原因</strong>
+            <ul>${reasons || "<li>暂无</li>"}</ul>
+            ${risks ? `<strong>风险 / 不确定性</strong><ul>${risks}</ul>` : ""}
+          </article>
+        `;
+      }).join("");
+      const shopSummary = buildAnalysis.shop_action ? `
+        <article class="event">
+          <h2>商店操作<span class="badge">${buildAnalysis.shop_action}</span></h2>
+          <p>${buildAnalysis.refresh_reason || ""}</p>
+        </article>
+      ` : "";
+      eventsEl.innerHTML = shopSummary + shopCandidates + eventCards;
     }
 
     function renderStateLists(state) {
@@ -1803,8 +2021,55 @@ HTML_PAGE = r"""<!doctype html>
         (item) => item.display_name || item.name,
         (item) => item.known === false ? "待补充" : ""
       );
-      renderList("#ownedCards", state.owned_cards_display || [], (item) => item.display_name || item.name, (item) => item.rarity || "");
-      renderList("#visibleCards", state.visible_cards_display || [], (item) => item.display_name || item.name);
+      const fallbackOwnedCards = state.owned_cards_display || [];
+      const fallbackOwnedItems = fallbackOwnedCards.filter(
+        (item) => String(item.card_type || "").toLowerCase() !== "skill"
+      );
+      const fallbackOwnedSkills = fallbackOwnedCards.filter(
+        (item) => String(item.card_type || "").toLowerCase() === "skill"
+      );
+      renderList(
+        "#ownedItems",
+        state.owned_items_display || fallbackOwnedItems,
+        (item) => item.display_name || item.name,
+        ownedMeta
+      );
+      renderList(
+        "#ownedSkills",
+        state.skills_display || fallbackOwnedSkills,
+        (item) => item.display_name || item.name,
+        ownedMeta
+      );
+      const shopVisible = state.current_shop && Array.isArray(state.current_shop.visible_items)
+        ? state.current_shop.visible_items
+        : [];
+      renderList(
+        "#visibleCards",
+        shopVisible.length ? shopVisible : (state.visible_cards_display || []),
+        (item) => item.display_name || item.name || item.template_id
+      );
+    }
+
+    function formatPrestige(state) {
+      if (state.prestige == null) return "-";
+      if (state.max_prestige == null) return state.prestige;
+      return `${state.prestige}/${state.max_prestige}`;
+    }
+
+    function ownedMeta(item) {
+      const parts = [];
+      if (item.rarity) parts.push(item.rarity);
+      if (item.section) parts.push(sectionLabel(item.section));
+      return parts.filter(Boolean).join(" · ");
+    }
+
+    function sectionLabel(section) {
+      const labels = {
+        board: "场上",
+        hand: "手牌",
+        stash: "仓库",
+      };
+      return labels[String(section || "").toLowerCase()] || section;
     }
 
     function renderList(selector, items, titleFn, metaFn = null) {

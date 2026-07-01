@@ -27,7 +27,8 @@ RECOMMENDATION_RANK = {
     "Low Value": 3,
 }
 
-SHOP_CARD_COUNT = 6
+VISIBLE_OFFER_COUNT = 3
+REFRESH_OFFER_COUNT = 3
 
 ENCHANTMENT_TAGS = {
     "fiery": ["burn"],
@@ -403,7 +404,7 @@ def get_alt_core_build_hits(
     return hits
 
 
-def probability_at_least_one(hit_ratio: float, draws: int = SHOP_CARD_COUNT) -> float:
+def probability_at_least_one(hit_ratio: float, draws: int = VISIBLE_OFFER_COUNT) -> float:
     if hit_ratio <= 0:
         return 0.0
     if hit_ratio >= 1:
@@ -490,7 +491,7 @@ def get_event_draw_count(event_data: dict[str, Any]) -> int:
     event_category = event_data.get("event_category")
 
     if event_category in {"shops", "skill_shops"}:
-        return SHOP_CARD_COUNT
+        return VISIBLE_OFFER_COUNT
 
     card_reward = event_data.get("card_reward")
     if isinstance(card_reward, dict):
@@ -583,6 +584,8 @@ def analyze_event(
     owned_card_enchantments: dict[str, list[str]] | None = None,
     include_followups: bool = True,
     all_builds: dict[str, Any] | None = None,
+    current_shop: dict[str, Any] | None = None,
+    current_gold: int | None = None,
 ) -> dict[str, Any]:
     owned_cards = owned_cards or {}
     owned_card_enchantments = owned_card_enchantments or {}
@@ -593,6 +596,25 @@ def analyze_event(
         rarity_rules,
         current_hero,
     )
+    is_shop = event_data.get("event_category") in {"shops", "skill_shops"}
+    refresh_pool_valuable_count = sum(
+        get_card_role_for_build(card["name"], card["raw"], build_name, build_data)
+        in {"core", "transition", "optional"}
+        for card in possible_cards
+    )
+    refresh_pool_ratio = (
+        refresh_pool_valuable_count / len(possible_cards)
+        if possible_cards
+        else 0.0
+    )
+    visible_items = current_shop.get("visible_items") if is_shop and current_shop else None
+    using_visible_items = isinstance(visible_items, list)
+    if using_visible_items:
+        visible_names = {
+            str(item.get("name") if isinstance(item, dict) else item)
+            for item in visible_items
+        }
+        possible_cards = [card for card in possible_cards if card.get("name") in visible_names]
 
     analyzed_cards: list[dict[str, Any]] = []
     role_counts = {role: 0 for role in ROLE_LABELS}
@@ -681,7 +703,7 @@ def analyze_event(
     core_ratio = core_count / total_pool_count if total_pool_count else 0.0
     high_tier_ratio = high_tier_count / total_pool_count if total_pool_count else 0.0
 
-    draw_count = get_event_draw_count(event_data)
+    draw_count = len(visible_items) if using_visible_items else get_event_draw_count(event_data)
     selection_count = get_event_selection_count(event_data)
 
     expected_sell_gold = expected_unrelated_sell_gold(
@@ -718,6 +740,44 @@ def analyze_event(
         owned_target_hits,
         event_data,
     )
+    shop_decision = None
+    if is_shop:
+        refresh_available = current_shop.get("refresh_available") if current_shop else None
+        refresh_cost = _optional_nonnegative_int(current_shop.get("refresh_cost")) if current_shop else None
+        visible_valuable = [
+            card for card in analyzed_cards
+            if card.get("role") in {"core", "transition", "optional"}
+        ]
+        if using_visible_items and visible_valuable:
+            action, rationale = "buy", "当前可见卡中已有构筑相关目标，不建议先刷新。"
+        elif refresh_available is False:
+            action, rationale = "skip", "当前不可刷新。"
+        elif refresh_cost is None:
+            action, rationale = "skip", "刷新成本未知，不主动建议刷新。"
+        elif current_gold is None:
+            action, rationale = "skip", "当前金币未知，无法确认刷新后购买力。"
+        elif current_gold <= refresh_cost:
+            action, rationale = "skip", "金币不足以在刷新后保留购买预算。"
+        elif refresh_pool_ratio >= 0.2:
+            action, rationale = "refresh", "当前没有明显目标，卡池匹配度较高且金币可承担刷新并保留购买预算。"
+        else:
+            action, rationale = "skip", "卡池与当前构筑匹配度不足，不建议付费刷新。"
+        shop_decision = {
+            "action": action,
+            "reason": rationale,
+            "visible_offer_count": VISIBLE_OFFER_COUNT,
+            "refresh_offer_count": REFRESH_OFFER_COUNT,
+            "using_visible_items": using_visible_items,
+            "refresh_available": refresh_available,
+            "refresh_cost": refresh_cost,
+            "gold_sufficient_for_refresh": (
+                current_gold > refresh_cost
+                if current_gold is not None and refresh_cost is not None
+                else None
+            ),
+            "refresh_pool_valuable_ratio": refresh_pool_ratio,
+        }
+        reasons.insert(0, rationale)
     for card in alt_core_cards:
         build_labels = "、".join(
             (
@@ -812,7 +872,16 @@ def analyze_event(
         "pool_stats": pool_stats,
         "recommendation": recommendation,
         "reasons": reasons,
+        "shop_decision": shop_decision,
     }
+
+
+def _optional_nonnegative_int(value: Any) -> int | None:
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        return None
+    return result if result >= 0 else None
 
 
 def select_best_followup_result(followup_results: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -1002,7 +1071,7 @@ def decide_recommendation(
     expected_sell_gold = pool_stats.get("expected_sell_gold", 0.0)
     prob_valuable = pool_stats.get("prob_valuable_in_shop", 0.0)
     prob_core = pool_stats.get("prob_core_in_shop", 0.0)
-    draw_count = int(pool_stats.get("draw_count", SHOP_CARD_COUNT))
+    draw_count = int(pool_stats.get("draw_count", VISIBLE_OFFER_COUNT))
     selection_count = int(pool_stats.get("selection_count", draw_count))
 
     has_skill_reward = event_has_skill_reward(event_data)
@@ -1075,9 +1144,9 @@ def decide_recommendation(
                 f"预期看到 {expected_valuable:.1f} 张构筑相关卡，"
                 f"至少看到一张的概率为 {prob_valuable:.0%}。"
             )
-        elif draw_count == SHOP_CARD_COUNT:
+        elif event_data.get("event_category") in {"shops", "skill_shops"}:
             reasons.append(
-                f"商店展示 {SHOP_CARD_COUNT} 张卡，预期命中 {expected_valuable:.1f} 张构筑相关卡；"
+                f"商店当前展示 {VISIBLE_OFFER_COUNT} 张卡，预期命中 {expected_valuable:.1f} 张构筑相关卡；"
                 f"至少看到一张的概率为 {prob_valuable:.0%}。"
             )
         else:

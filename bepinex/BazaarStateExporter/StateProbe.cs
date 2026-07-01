@@ -21,6 +21,11 @@ namespace BazaarStateExporter
         private int? lastLoggedUiDay;
         private bool loggedUiCandidate;
         private string lastSnapshotHero;
+        private int? lastSnapshotDay;
+        private float suppressCachedSnapshotUntil;
+        private string pendingNewRunHero;
+        private int pendingNewRunDay = 1;
+        private string lastLoggedAttributeKeys;
 
         public StateProbe(ManualLogSource logger)
         {
@@ -29,6 +34,11 @@ namespace BazaarStateExporter
 
         public GameStateSnapshot TryReadCurrentState()
         {
+            if (Time.unscaledTime < suppressCachedSnapshotUntil)
+            {
+                return CreateNewRunTransitionSnapshot();
+            }
+
             object processor = RuntimeStateCache.NetMessageProcessor;
             if (processor != null)
             {
@@ -148,6 +158,7 @@ namespace BazaarStateExporter
             }
 
             List<CardSnapshot> visibleCards = new List<CardSnapshot>();
+            bool changed = false;
             UnityEngine.Object[] controllers = Resources.FindObjectsOfTypeAll(cardControllerType);
             foreach (UnityEngine.Object controller in controllers)
             {
@@ -161,10 +172,30 @@ namespace BazaarStateExporter
                 if (card != null && !string.IsNullOrEmpty(card.id))
                 {
                     visibleCards.Add(card);
+                    changed = RuntimeStateCache.RecordUiCard(card) || changed;
                 }
             }
 
             RuntimeStateCache.SetCurrentVisibleCards(visibleCards);
+            if (visibleCards.Any(IsCurrentEventOptionCard))
+            {
+                RuntimeStateCache.ClearShopRefresh();
+                RuntimeStateCache.SetScreenMode(
+                    RuntimeStateCache.ScreenModeEvents,
+                    "visible_scan");
+                changed = true;
+            }
+            else if (visibleCards.Any(IsShopOfferCard))
+            {
+                RuntimeStateCache.SetScreenMode(
+                    RuntimeStateCache.ScreenModeShop,
+                    "visible_scan");
+                changed = true;
+            }
+            if (changed)
+            {
+                Plugin.RequestEventExport();
+            }
         }
 
         public void ScanUiResources()
@@ -313,41 +344,126 @@ namespace BazaarStateExporter
             object currentState = GetField(dto, "CurrentState");
             object player = GetField(dto, "Player");
             string hero = StringValue(GetField(player, "Hero"));
-            if (!string.IsNullOrEmpty(lastSnapshotHero)
-                && !string.Equals(lastSnapshotHero, hero, StringComparison.OrdinalIgnoreCase))
+            int day = IntValue(GetField(run, "Day"), 1);
+            if (latestUiDay.HasValue)
+            {
+                day = latestUiDay.Value;
+            }
+
+            bool heroChanged = !string.IsNullOrEmpty(lastSnapshotHero)
+                && !string.Equals(lastSnapshotHero, hero, StringComparison.OrdinalIgnoreCase);
+            bool dayRestarted = !heroChanged
+                && lastSnapshotDay.HasValue
+                && day <= 2
+                && day < lastSnapshotDay.Value;
+
+            if (dayRestarted)
+            {
+                ResetLocalRunState();
+                RuntimeStateCache.ResetForNewRun();
+                RuntimeStateCache.LatestGameStateSnapshot = null;
+                pendingNewRunHero = hero;
+                pendingNewRunDay = day;
+                lastSnapshotHero = hero;
+                lastSnapshotDay = day;
+                suppressCachedSnapshotUntil = Time.unscaledTime + 2.0f;
+                logger.LogInfo(
+                    "Detected a new run from day rollback; cleared previous-run state. hero="
+                    + hero
+                    + " day="
+                    + day);
+                return CreateNewRunTransitionSnapshot();
+            }
+
+            if (heroChanged)
             {
                 RuntimeStateCache.ResetForNewRun();
-                loggedUiResourceObjects.Clear();
-                loggedUiCandidate = false;
-                lastLoggedUiGold = null;
-                lastLoggedUiHealth = null;
-                latestUiDay = null;
-                lastLoggedUiDay = null;
+                ResetLocalRunState();
             }
             if (!string.IsNullOrEmpty(hero))
             {
                 lastSnapshotHero = hero;
             }
+            lastSnapshotDay = day;
+            pendingNewRunHero = null;
 
             GameStateSnapshot snapshot = new GameStateSnapshot
             {
                 source = "bepinex",
                 hero = hero,
-                day = IntValue(GetField(run, "Day"), 1),
+                day = day,
+                max_prestige = 20,
+                inventory_slots_total = 10,
                 event_option_ids = StringList(GetField(currentState, "SelectionSet")),
             };
-            if (latestUiDay.HasValue)
-            {
-                snapshot.day = latestUiDay.Value;
-            }
 
             object allCards = GetField(dto, "Cards");
             List<CardSnapshot> allCardSnapshots = CardList(allCards).ToList();
+            string screenMode = RuntimeStateCache.GetScreenMode(10f);
+            bool screenModeIsShop = string.Equals(
+                screenMode,
+                RuntimeStateCache.ScreenModeShop,
+                StringComparison.Ordinal);
+            bool screenModeIsEvents = string.Equals(
+                screenMode,
+                RuntimeStateCache.ScreenModeEvents,
+                StringComparison.Ordinal);
+            List<CardSnapshot> selectedCards = allCardSnapshots
+                .Where(card => !string.IsNullOrEmpty(card.id)
+                    && snapshot.event_option_ids.Contains(card.id))
+                .ToList();
+            bool selectionSetHasEncounters = selectedCards.Any(card =>
+                (card.card_type ?? "").IndexOf(
+                    "Encounter",
+                    StringComparison.OrdinalIgnoreCase) >= 0
+                || (card.id ?? "").StartsWith(
+                    "enc_",
+                    StringComparison.OrdinalIgnoreCase));
+            if (selectionSetHasEncounters && !screenModeIsShop)
+            {
+                RuntimeStateCache.ClearShopRefresh();
+            }
+            bool selectionSetIsShopItems =
+                (!selectionSetHasEncounters || screenModeIsShop)
+                && RuntimeStateCache.ShopRefreshAvailable.HasValue
+                && selectedCards.Count > 0
+                && selectedCards.All(card => string.Equals(
+                    card.card_type,
+                    "Item",
+                    StringComparison.OrdinalIgnoreCase));
+            if (selectionSetIsShopItems)
+            {
+                snapshot.event_options.Clear();
+                snapshot.event_option_ids.Clear();
+            }
             snapshot.event_options.AddRange(snapshot.event_option_ids);
             snapshot.owned_cards.AddRange(BuildCurrentOwnedCards(dto, allCardSnapshots));
+            foreach (CardSnapshot owned in snapshot.owned_cards)
+            {
+                if (string.Equals(owned.card_type, "Skill", StringComparison.OrdinalIgnoreCase))
+                {
+                    snapshot.skills.Add(owned);
+                    continue;
+                }
+
+                snapshot.owned_items.Add(owned);
+                if (string.Equals(owned.section, "Hand", StringComparison.OrdinalIgnoreCase))
+                {
+                    snapshot.board_items.Add(owned);
+                }
+                else if (string.Equals(owned.section, "Stash", StringComparison.OrdinalIgnoreCase))
+                {
+                    snapshot.stash_items.Add(owned);
+                }
+            }
 
             HashSet<string> eventOptionIdSet = new HashSet<string>(snapshot.event_option_ids);
             HashSet<string> detailedEventOptionIds = new HashSet<string>();
+            List<CardSnapshot> shopCards = new List<CardSnapshot>();
+            if (selectionSetIsShopItems && !screenModeIsShop)
+            {
+                shopCards.AddRange(selectedCards);
+            }
             foreach (CardSnapshot card in allCardSnapshots)
             {
                 if (!string.IsNullOrEmpty(card.id) && eventOptionIdSet.Contains(card.id))
@@ -367,6 +483,14 @@ namespace BazaarStateExporter
                 {
                     snapshot.visible_cards.Add(card);
                 }
+                if (section.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    shopCards.Add(card);
+                }
+                if (section.IndexOf("Reward", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    snapshot.current_reward_options.Add(card);
+                }
             }
             foreach (string optionId in snapshot.event_option_ids)
             {
@@ -383,11 +507,137 @@ namespace BazaarStateExporter
                 }
             }
 
-            MergeCapturedUiCards(snapshot, eventOptionIdSet, detailedEventOptionIds);
+            if (screenModeIsShop)
+            {
+                snapshot.event_options.Clear();
+                snapshot.event_option_ids.Clear();
+                snapshot.event_option_template_ids.Clear();
+                snapshot.event_options_detailed.Clear();
+                eventOptionIdSet.Clear();
+                detailedEventOptionIds.Clear();
+            }
+            else
+            {
+                float eventCaptureMinSeenAt = screenModeIsEvents
+                    ? Math.Max(0f, RuntimeStateCache.LastScreenModeAt - 1.0f)
+                    : 0f;
+                if (screenModeIsEvents)
+                {
+                    snapshot.event_options.Clear();
+                    snapshot.event_option_ids.Clear();
+                    snapshot.event_option_template_ids.Clear();
+                    snapshot.event_options_detailed.Clear();
+                    eventOptionIdSet.Clear();
+                    detailedEventOptionIds.Clear();
+                }
+                MergeCapturedUiCards(
+                    snapshot,
+                    eventOptionIdSet,
+                    detailedEventOptionIds,
+                    eventCaptureMinSeenAt);
+            }
+            snapshot.current_events.AddRange(snapshot.event_options_detailed);
+
+            // Rebuild screen-specific groups after merging UI-captured cards so
+            // current_shop never includes Selection/Reward cards.
+            if (!selectionSetIsShopItems && !screenModeIsShop)
+            {
+                shopCards.Clear();
+            }
+            snapshot.current_reward_options.Clear();
+            float shopCaptureMinSeenAt = screenModeIsShop
+                ? Math.Max(0f, RuntimeStateCache.LastScreenModeAt - 1.0f)
+                : 0f;
+            List<CardSnapshot> recentlyCapturedCards =
+                RuntimeStateCache.GetCapturedUiCards(30f, shopCaptureMinSeenAt);
+            List<CardSnapshot> latestSocketOffers =
+                RuntimeStateCache.GetLatestOpponentItemSocketCards(30f, shopCaptureMinSeenAt);
+            bool merchantScreen = recentlyCapturedCards.Any(card =>
+                (card.ui_context ?? "").IndexOf(
+                    "OpponentPortraitSocketMerchant",
+                    StringComparison.OrdinalIgnoreCase) >= 0);
+            merchantScreen = screenModeIsShop
+                || (!screenModeIsEvents
+                && !selectionSetHasEncounters
+                && (
+                    merchantScreen
+                    || RuntimeStateCache.ShopRefreshAvailable.HasValue
+                    || RuntimeStateCache.ShopRefreshCost.HasValue
+                    || RuntimeStateCache.ShopRefreshesRemaining.HasValue
+                ));
+            if (merchantScreen)
+            {
+                if (latestSocketOffers.Count > 0)
+                {
+                    shopCards.Clear();
+                    shopCards.AddRange(latestSocketOffers);
+                }
+                foreach (CardSnapshot capturedOffer in recentlyCapturedCards.Where(IsShopOfferCard))
+                {
+                    if (latestSocketOffers.Count > 0
+                        && !latestSocketOffers.Any(card =>
+                            card.id == capturedOffer.id))
+                    {
+                        continue;
+                    }
+                    UpsertCardById(shopCards, capturedOffer);
+                }
+            }
+            foreach (CardSnapshot visible in snapshot.visible_cards)
+            {
+                string section = visible.section ?? "";
+                string uiContext = visible.ui_context ?? "";
+                if (!screenModeIsShop
+                    && (section.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0
+                    || uiContext.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0)
+                )
+                {
+                    UpsertCardById(shopCards, visible);
+                }
+                if (section.IndexOf("Reward", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    snapshot.current_reward_options.Add(visible);
+                }
+            }
+            if (shopCards.Count > 0
+                || RuntimeStateCache.ShopRefreshAvailable.HasValue
+                || RuntimeStateCache.ShopRefreshCost.HasValue
+                || RuntimeStateCache.ShopRefreshesRemaining.HasValue)
+            {
+                snapshot.current_shop = new CurrentShopSnapshot();
+                snapshot.current_shop.visible_items.AddRange(shopCards);
+                snapshot.current_shop.refresh_available =
+                    RuntimeStateCache.ShopRefreshAvailable;
+                snapshot.current_shop.refresh_cost =
+                    RuntimeStateCache.ShopRefreshCost;
+                snapshot.current_shop.refreshes_remaining =
+                    RuntimeStateCache.ShopRefreshesRemaining;
+            }
 
             Dictionary<string, int> attributes = AttributeDictionary(GetField(player, "Attributes"));
+            string attributeKeys = string.Join(
+                ",",
+                attributes.Keys.OrderBy(key => key, StringComparer.OrdinalIgnoreCase));
+            if (!string.Equals(
+                lastLoggedAttributeKeys,
+                attributeKeys,
+                StringComparison.Ordinal))
+            {
+                lastLoggedAttributeKeys = attributeKeys;
+                logger.LogInfo("Player attribute keys: " + attributeKeys);
+            }
             snapshot.gold = FindAttribute(attributes, "Gold");
             snapshot.health = FindAttribute(attributes, "Health");
+            snapshot.combat_health = snapshot.health;
+            snapshot.income = FindAttributeExact(attributes, "Income");
+            snapshot.level = FindAttributeExact(attributes, "Level");
+            snapshot.xp = FindAttributeExact(attributes, "XP", "Experience");
+            snapshot.prestige = FindAttributeExact(attributes, "Prestige");
+            snapshot.max_prestige = FindAttributeExact(
+                attributes,
+                "MaxPrestige",
+                "Max Prestige",
+                "PrestigeMax") ?? 20;
             RuntimeStateCache.UpdateResources(snapshot.gold, snapshot.health, "game_state_sync");
 
             if (RuntimeStateCache.LatestGold.HasValue)
@@ -397,6 +647,7 @@ namespace BazaarStateExporter
             if (RuntimeStateCache.LatestHealth.HasValue)
             {
                 snapshot.health = RuntimeStateCache.LatestHealth;
+                snapshot.combat_health = RuntimeStateCache.LatestHealth;
             }
 
             if (snapshot.event_option_ids.Count > 0 || snapshot.owned_cards.Count > 0)
@@ -417,6 +668,26 @@ namespace BazaarStateExporter
             }
 
             return snapshot;
+        }
+
+        private GameStateSnapshot CreateNewRunTransitionSnapshot()
+        {
+            return new GameStateSnapshot
+            {
+                source = "bepinex",
+                hero = pendingNewRunHero,
+                day = pendingNewRunDay,
+            };
+        }
+
+        private void ResetLocalRunState()
+        {
+            loggedUiResourceObjects.Clear();
+            loggedUiCandidate = false;
+            lastLoggedUiGold = null;
+            lastLoggedUiHealth = null;
+            latestUiDay = null;
+            lastLoggedUiDay = null;
         }
 
         private static List<CardSnapshot> BuildCurrentOwnedCards(
@@ -451,6 +722,73 @@ namespace BazaarStateExporter
         {
             return string.Equals(section, "Hand", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(section, "Stash", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsShopOfferCard(CardSnapshot card)
+        {
+            if (card == null
+                || string.IsNullOrEmpty(card.id)
+                || !string.Equals(card.card_type, "Item", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string section = card.section ?? "";
+            string context = card.ui_context ?? "";
+            if (section.IndexOf("Reward", StringComparison.OrdinalIgnoreCase) >= 0
+                || section.IndexOf("Selection", StringComparison.OrdinalIgnoreCase) >= 0
+                || IsOwnedItemSection(section))
+            {
+                return false;
+            }
+
+            return section.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0
+                || context.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0
+                || context.IndexOf("Merchant", StringComparison.OrdinalIgnoreCase) >= 0
+                || context.IndexOf("OpponentItemSocket_", StringComparison.OrdinalIgnoreCase) >= 0
+                || context.IndexOf("OpponentPortraitSocketMerchant", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsCurrentEventOptionCard(CardSnapshot card)
+        {
+            if (card == null || string.IsNullOrEmpty(card.id))
+            {
+                return false;
+            }
+
+            string cardType = card.card_type ?? "";
+            bool eventEncounter = cardType.IndexOf(
+                    "EventEncounter",
+                    StringComparison.OrdinalIgnoreCase) >= 0
+                || card.id.StartsWith("enc_", StringComparison.OrdinalIgnoreCase);
+            if (!eventEncounter)
+            {
+                return false;
+            }
+
+            string context = card.ui_context ?? "";
+            return context.IndexOf("Merchant", StringComparison.OrdinalIgnoreCase) < 0
+                && context.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
+        private static void UpsertCardById(List<CardSnapshot> cards, CardSnapshot card)
+        {
+            if (cards == null || card == null)
+            {
+                return;
+            }
+
+            int existingIndex = cards.FindIndex(existing =>
+                !string.IsNullOrEmpty(existing.id)
+                && existing.id == card.id);
+            if (existingIndex >= 0)
+            {
+                cards[existingIndex] = card;
+            }
+            else
+            {
+                cards.Add(card);
+            }
         }
 
         private static void AddUniqueCard(
@@ -953,15 +1291,26 @@ namespace BazaarStateExporter
         private static void MergeCapturedUiCards(
             GameStateSnapshot snapshot,
             HashSet<string> eventOptionIdSet,
-            HashSet<string> detailedEventOptionIds)
+            HashSet<string> detailedEventOptionIds,
+            float minSeenAt)
         {
-            List<CardSnapshot> capturedCards = RuntimeStateCache.GetCurrentVisibleCards();
+            List<CardSnapshot> capturedCards = minSeenAt > 0f
+                ? new List<CardSnapshot>()
+                : RuntimeStateCache.GetCurrentVisibleCards();
+            foreach (CardSnapshot recentCard in RuntimeStateCache.GetCapturedUiCards(6f, minSeenAt))
+            {
+                if (recentCard == null || string.IsNullOrEmpty(recentCard.id))
+                {
+                    continue;
+                }
+                if (capturedCards.Any(card => card != null && card.id == recentCard.id))
+                {
+                    continue;
+                }
+                capturedCards.Add(recentCard);
+            }
             List<CardSnapshot> currentEventCards = capturedCards
-                .Where(card => card != null
-                    && !string.IsNullOrEmpty(card.id)
-                    && (card.card_type ?? "").IndexOf(
-                        "Encounter",
-                        StringComparison.OrdinalIgnoreCase) >= 0)
+                .Where(IsCurrentEventOptionCard)
                 .ToList();
 
             if (currentEventCards.Count > 0)
@@ -1001,9 +1350,7 @@ namespace BazaarStateExporter
                 }
 
                 string section = card.section ?? "";
-                bool eventCard = (card.card_type ?? "").IndexOf(
-                    "Encounter",
-                    StringComparison.OrdinalIgnoreCase) >= 0;
+                bool eventCard = IsCurrentEventOptionCard(card);
                 if (eventCard)
                 {
                     if (eventOptionIdSet.Add(card.id))
@@ -1101,6 +1448,8 @@ namespace BazaarStateExporter
                 section = card.section,
                 card_type = card.card_type,
                 source = card.source,
+                ui_context = card.ui_context,
+                price = card.price,
             };
             clone.enchantments.AddRange(card.enchantments);
             return clone;
@@ -1173,6 +1522,21 @@ namespace BazaarStateExporter
                 }
             }
 
+            return null;
+        }
+
+        private static int? FindAttributeExact(
+            Dictionary<string, int> attributes,
+            params string[] names)
+        {
+            foreach (string name in names)
+            {
+                int value;
+                if (attributes.TryGetValue(name, out value))
+                {
+                    return value;
+                }
+            }
             return null;
         }
 

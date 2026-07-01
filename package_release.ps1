@@ -16,7 +16,10 @@ if (-not (Test-Path $BundledPython)) {
 $env:PYTHONPATH = $VenvSitePackages
 
 Write-Host "[1/5] Running release tests..."
-& $BundledPython -m pytest -q tests\test_app_paths.py tests\test_web_app.py
+$PytestTemp = Join-Path $ProjectRoot ".tmp\pytest-release"
+New-Item -ItemType Directory -Path $PytestTemp -Force | Out-Null
+& $BundledPython -m pytest -q tests\test_app_paths.py tests\test_web_app.py `
+    -p no:cacheprovider --basetemp $PytestTemp
 if ($LASTEXITCODE -ne 0) {
     throw "Tests failed."
 }

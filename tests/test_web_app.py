@@ -94,6 +94,44 @@ class WebAppResilienceTests(unittest.TestCase):
 
             self.assertTrue(web_app.runtime_state_is_plugin_owned(state_path))
 
+    def test_owned_items_and_skills_are_displayed_separately(self) -> None:
+        data = {
+            "events": {},
+            "translations": {},
+            "cards": {
+                "Test Item": {"type": "Item"},
+                "Test Skill": {"type": "Skill"},
+            },
+            "builds": {"VanessaTest": {"hero": "Vanessa"}},
+            "rarity_rules": {},
+        }
+        payload = {
+            "hero": "Vanessa",
+            "build": "VanessaTest",
+            "day": 5,
+            "event_options": [],
+            "owned_cards": [
+                {"name": "Test Item", "rarity": "gold"},
+                {"name": "Test Skill", "rarity": "silver"},
+            ],
+            "visible_cards": [],
+            "prestige": 7,
+            "max_prestige": 10,
+        }
+
+        response = web_app.analyze_payload(data, payload)
+
+        self.assertEqual(response["state"]["prestige"], 7)
+        self.assertEqual(response["state"]["max_prestige"], 10)
+        self.assertEqual(
+            [item["name"] for item in response["state"]["owned_items_display"]],
+            ["Test Item"],
+        )
+        self.assertEqual(
+            [item["name"] for item in response["state"]["skills_display"]],
+            ["Test Skill"],
+        )
+
     def test_priority_cards_exclude_other_build_cores_and_have_no_limit(self) -> None:
         cards = web_app.priority_cards(
             [
