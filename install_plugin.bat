@@ -86,11 +86,12 @@ if errorlevel 1 (
 > "!CONFIG_FILE!" echo [Export]
 >> "!CONFIG_FILE!" echo OutputPath = !OUTPUT_PATH!
 >> "!CONFIG_FILE!" echo PollIntervalSeconds = 1
+>> "!CONFIG_FILE!" echo EnableHudResourceScanning = true
+>> "!CONFIG_FILE!" echo EnableVisibleCardScanning = true
 >> "!CONFIG_FILE!" echo.
 >> "!CONFIG_FILE!" echo [Debug]
 >> "!CONFIG_FILE!" echo WritePlaceholderWhenEmpty = false
 >> "!CONFIG_FILE!" echo EnableRuntimeInspection = false
->> "!CONFIG_FILE!" echo EnableVisibleCardScanning = true
 if errorlevel 1 (
     echo ERROR: Cannot write plugin config:
     echo !CONFIG_FILE!

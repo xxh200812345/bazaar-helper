@@ -176,17 +176,17 @@ namespace BazaarStateExporter
             }
 
             RuntimeStateCache.SetCurrentVisibleCards(visibleCards);
-            if (visibleCards.Any(IsCurrentEventOptionCard))
+            if (visibleCards.Any(IsShopOfferCard))
+            {
+                RuntimeStateCache.SetScreenMode(
+                    RuntimeStateCache.ScreenModeShop,
+                    "visible_scan");
+            }
+            else if (visibleCards.Any(IsCurrentEventOptionCard))
             {
                 RuntimeStateCache.ClearShopRefresh();
                 RuntimeStateCache.SetScreenMode(
                     RuntimeStateCache.ScreenModeEvents,
-                    "visible_scan");
-            }
-            else if (visibleCards.Any(IsShopOfferCard))
-            {
-                RuntimeStateCache.SetScreenMode(
-                    RuntimeStateCache.ScreenModeShop,
                     "visible_scan");
             }
         }
@@ -431,6 +431,7 @@ namespace BazaarStateExporter
             }
             snapshot.event_options.AddRange(snapshot.event_option_ids);
             snapshot.owned_cards.AddRange(BuildCurrentOwnedCards(dto, allCardSnapshots));
+            MergeCapturedOwnedCards(snapshot.owned_cards);
             foreach (CardSnapshot owned in snapshot.owned_cards)
             {
                 if (string.Equals(owned.card_type, "Skill", StringComparison.OrdinalIgnoreCase))
@@ -514,15 +515,6 @@ namespace BazaarStateExporter
                 float eventCaptureMinSeenAt = screenModeIsEvents
                     ? Math.Max(0f, RuntimeStateCache.LastScreenModeAt - 1.0f)
                     : 0f;
-                if (screenModeIsEvents)
-                {
-                    snapshot.event_options.Clear();
-                    snapshot.event_option_ids.Clear();
-                    snapshot.event_option_template_ids.Clear();
-                    snapshot.event_options_detailed.Clear();
-                    eventOptionIdSet.Clear();
-                    detailedEventOptionIds.Clear();
-                }
                 MergeCapturedUiCards(
                     snapshot,
                     eventOptionIdSet,
@@ -709,6 +701,61 @@ namespace BazaarStateExporter
             }
 
             return result;
+        }
+
+        private static void MergeCapturedOwnedCards(List<CardSnapshot> ownedCards)
+        {
+            if (ownedCards == null)
+            {
+                return;
+            }
+
+            HashSet<string> seenIds = new HashSet<string>(
+                ownedCards
+                    .Where(card => card != null && !string.IsNullOrEmpty(card.id))
+                    .Select(card => card.id));
+
+            List<CardSnapshot> candidates = RuntimeStateCache.GetCurrentVisibleCards();
+            foreach (CardSnapshot recentCard in RuntimeStateCache.GetCapturedUiCards(8f))
+            {
+                if (recentCard == null || string.IsNullOrEmpty(recentCard.id))
+                {
+                    continue;
+                }
+                if (candidates.Any(card => card != null && card.id == recentCard.id))
+                {
+                    continue;
+                }
+                candidates.Add(recentCard);
+            }
+
+            foreach (CardSnapshot card in candidates)
+            {
+                if (!IsCapturedOwnedItemCard(card))
+                {
+                    continue;
+                }
+                if (seenIds.Add(card.id))
+                {
+                    ownedCards.Add(card);
+                }
+            }
+        }
+
+        private static bool IsCapturedOwnedItemCard(CardSnapshot card)
+        {
+            if (card == null
+                || string.IsNullOrEmpty(card.id)
+                || !string.Equals(card.card_type, "Item", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string section = card.section ?? "";
+            string context = card.ui_context ?? "";
+            return IsOwnedItemSection(section)
+                || context.IndexOf("PlayerItemSocket_", StringComparison.OrdinalIgnoreCase) >= 0
+                || context.IndexOf("PlayerStorageSocket_", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static bool IsOwnedItemSection(string section)
@@ -1287,10 +1334,8 @@ namespace BazaarStateExporter
             HashSet<string> detailedEventOptionIds,
             float minSeenAt)
         {
-            List<CardSnapshot> capturedCards = minSeenAt > 0f
-                ? new List<CardSnapshot>()
-                : RuntimeStateCache.GetCurrentVisibleCards();
-            foreach (CardSnapshot recentCard in RuntimeStateCache.GetCapturedUiCards(6f, minSeenAt))
+            List<CardSnapshot> capturedCards = RuntimeStateCache.GetCurrentVisibleCards();
+            foreach (CardSnapshot recentCard in RuntimeStateCache.GetCapturedUiCards(15f, minSeenAt))
             {
                 if (recentCard == null || string.IsNullOrEmpty(recentCard.id))
                 {
@@ -1306,7 +1351,14 @@ namespace BazaarStateExporter
                 .Where(IsCurrentEventOptionCard)
                 .ToList();
 
-            if (currentEventCards.Count > 0)
+            bool uiLooksLikeFullReplacement =
+                currentEventCards.Count > 0
+                && (
+                    eventOptionIdSet.Count == 0
+                    || currentEventCards.Count >= eventOptionIdSet.Count
+                    || !currentEventCards.Any(card => eventOptionIdSet.Contains(card.id))
+                );
+            if (uiLooksLikeFullReplacement)
             {
                 snapshot.event_options.Clear();
                 snapshot.event_option_ids.Clear();

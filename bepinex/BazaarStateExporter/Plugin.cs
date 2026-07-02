@@ -19,6 +19,7 @@ namespace BazaarStateExporter
         private ConfigEntry<float> pollIntervalSeconds;
         private ConfigEntry<bool> writePlaceholderWhenEmpty;
         private ConfigEntry<bool> enableVisibleCardScanning;
+        private ConfigEntry<bool> enableHudResourceScanning;
         private ConfigEntry<bool> enableUnsafeUiScanning;
         private StateProbe probe;
         private Harmony harmony;
@@ -58,6 +59,11 @@ namespace BazaarStateExporter
                 "EnableVisibleCardScanning",
                 true,
                 "Automatically scan visible CardController objects so event/shop screens update without mouse hover.");
+            enableHudResourceScanning = Config.Bind(
+                "Export",
+                "EnableHudResourceScanning",
+                true,
+                "Read visible HUD resources such as gold and health so purchases update even when cached game state lags.");
             enableUnsafeUiScanning = Config.Bind(
                 "Debug",
                 "EnableUnsafeUiScanning",
@@ -151,7 +157,7 @@ namespace BazaarStateExporter
                 {
                     probe.ScanVisibleUiCards();
                 }
-                if (enableUnsafeUiScanning.Value)
+                if (enableHudResourceScanning.Value || enableUnsafeUiScanning.Value)
                 {
                     probe.ScanUiResources();
                 }
