@@ -82,6 +82,9 @@ namespace BazaarStateExporter
                 + PluginVersion
                 + " loaded with event-driven export. OutputPath="
                 + resolvedOutputPath);
+            WriteStatusSnapshot(
+                "waiting_for_game_state",
+                "Plugin loaded and output path is writable. Waiting for live run state.");
         }
 
         private string ResolveOutputPath(string configuredPath, string defaultOutputPath)
@@ -160,6 +163,9 @@ namespace BazaarStateExporter
 
                 if (snapshot == null)
                 {
+                    WriteStatusSnapshot(
+                        "waiting_for_game_state",
+                        "Plugin is loaded, but no NetMessageGameStateSync has been captured yet.");
                     return;
                 }
 
@@ -183,8 +189,26 @@ namespace BazaarStateExporter
             {
                 snapshot.source = "bepinex";
             }
+            snapshot.status = null;
+            snapshot.message = null;
             snapshot.updated_at_utc = DateTime.UtcNow.ToString("o");
             JsonStateWriter.WriteAtomic(outputPath.Value, snapshot);
+        }
+
+        private void WriteStatusSnapshot(string status, string message)
+        {
+            try
+            {
+                GameStateSnapshot snapshot = GameStateSnapshot.CreateWaitingForGameState();
+                snapshot.status = status;
+                snapshot.message = message;
+                snapshot.updated_at_utc = DateTime.UtcNow.ToString("o");
+                JsonStateWriter.WriteAtomic(outputPath.Value, snapshot);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Failed to write exporter status snapshot: " + ex);
+            }
         }
     }
 

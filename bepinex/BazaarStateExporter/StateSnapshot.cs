@@ -5,6 +5,8 @@ namespace BazaarStateExporter
     public sealed class GameStateSnapshot
     {
         public string source;
+        public string status;
+        public string message;
         public string updated_at_utc;
         public string hero;
         public int day;
@@ -51,6 +53,16 @@ namespace BazaarStateExporter
                 },
                 gold = 12,
                 health = 43
+            };
+        }
+
+        public static GameStateSnapshot CreateWaitingForGameState()
+        {
+            return new GameStateSnapshot
+            {
+                source = "bepinex",
+                status = "waiting_for_game_state",
+                message = "Bazaar State Exporter loaded, but no live run state has been captured yet. Start or restart the game and enter a run."
             };
         }
     }

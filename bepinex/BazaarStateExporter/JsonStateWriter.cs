@@ -72,6 +72,8 @@ namespace BazaarStateExporter
             JsonBuilder json = new JsonBuilder();
             json.BeginObject();
             json.Property("source", snapshot.source);
+            json.Property("status", snapshot.status);
+            json.Property("message", snapshot.message);
             json.Property("updated_at_utc", snapshot.updated_at_utc);
             json.Property("hero", snapshot.hero);
             json.Property("day", snapshot.day);

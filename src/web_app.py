@@ -84,6 +84,15 @@ def load_runtime_payload() -> tuple[dict[str, Any], Path]:
             "实时状态文件还只是安装器创建的占位文件。"
             "请先启动或重启 The Bazaar，并进入一局游戏，等待插件写入真实状态。"
         )
+    if (
+        isinstance(payload, dict)
+        and payload.get("source") == "bepinex"
+        and payload.get("status") == "waiting_for_game_state"
+    ):
+        raise RuntimeError(
+            "插件已经加载并能写入实时状态文件，但还没有捕获到局内状态。"
+            "请启动或重启 The Bazaar，并进入一局游戏。"
+        )
 
     age_seconds = max(0.0, time.time() - STATE_PATH.stat().st_mtime)
     if age_seconds > MAX_STATE_AGE_SECONDS:
