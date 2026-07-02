@@ -6,8 +6,8 @@ from pathlib import Path
 
 from advisor import analyze_game_state
 from ai_advisor import (
-    DEFAULT_DEEPSEEK_BASE_URL,
-    DEFAULT_DEEPSEEK_MODEL,
+    DEFAULT_AI_BASE_URL,
+    DEFAULT_AI_MODEL,
     analyze_with_ai,
     compact_recommendations,
 )
@@ -141,13 +141,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--ai-model",
-        default=DEFAULT_DEEPSEEK_MODEL,
-        help=f"DeepSeek model name. Default: {DEFAULT_DEEPSEEK_MODEL}.",
+        default=DEFAULT_AI_MODEL,
+        help=f"AI model name. Default: {DEFAULT_AI_MODEL}.",
     )
     parser.add_argument(
         "--ai-base-url",
-        default=DEFAULT_DEEPSEEK_BASE_URL,
-        help=f"DeepSeek-compatible API base URL. Default: {DEFAULT_DEEPSEEK_BASE_URL}.",
+        default=DEFAULT_AI_BASE_URL,
+        help=f"OpenAI-compatible API base URL. Default: {DEFAULT_AI_BASE_URL}.",
     )
     parser.add_argument(
         "--ai-timeout",

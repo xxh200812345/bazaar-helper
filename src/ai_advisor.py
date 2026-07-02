@@ -13,9 +13,10 @@ from recommender import format_resource_rewards
 from app_paths import get_runtime_dir
 
 
-DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
-DEFAULT_API_KEY_FILE = get_runtime_dir() / "deepseek_api_key.txt"
+DEFAULT_AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.deepseek.com")
+DEFAULT_AI_MODEL = os.environ.get("AI_MODEL", "deepseek-chat")
+DEFAULT_API_KEY_FILE = get_runtime_dir() / "ai_api_key.txt"
+LEGACY_API_KEY_FILE = get_runtime_dir() / "deepseek_api_key.txt"
 STAGE_LABELS_ZH = {
     "early": "前期",
     "mid": "中期",
@@ -386,6 +387,8 @@ def build_ai_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
 
 def read_api_key_file(path: Path = DEFAULT_API_KEY_FILE) -> str | None:
     if not path.exists():
+        if path == DEFAULT_API_KEY_FILE and LEGACY_API_KEY_FILE.exists():
+            return LEGACY_API_KEY_FILE.read_text(encoding="utf-8").strip() or None
         return None
 
     api_key = path.read_text(encoding="utf-8").strip()
@@ -393,7 +396,7 @@ def read_api_key_file(path: Path = DEFAULT_API_KEY_FILE) -> str | None:
 
 
 def resolve_api_key(api_key: str | None = None) -> str | None:
-    return api_key or os.environ.get("DEEPSEEK_API_KEY") or read_api_key_file()
+    return api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") or read_api_key_file()
 
 
 def clean_ai_output(text: str) -> str:
@@ -426,14 +429,14 @@ def call_deepseek(
     messages: list[dict[str, str]],
     *,
     api_key: str | None = None,
-    model: str = DEFAULT_DEEPSEEK_MODEL,
-    base_url: str = DEFAULT_DEEPSEEK_BASE_URL,
+    model: str = DEFAULT_AI_MODEL,
+    base_url: str = DEFAULT_AI_BASE_URL,
     timeout: int = 30,
 ) -> str:
     api_key = resolve_api_key(api_key)
     if not api_key:
         raise RuntimeError(
-            "没有找到 DeepSeek API Key。请在启动 UI 前设置 DEEPSEEK_API_KEY，"
+            "没有找到 API Key。请在启动 UI 前设置 GEMINI_API_KEY 或 DEEPSEEK_API_KEY，"
             f"或把 key 放到 {DEFAULT_API_KEY_FILE}。"
         )
 
@@ -473,8 +476,8 @@ def call_deepseek(
 def analyze_with_ai(
     payload: dict[str, Any],
     *,
-    model: str = DEFAULT_DEEPSEEK_MODEL,
-    base_url: str = DEFAULT_DEEPSEEK_BASE_URL,
+    model: str = DEFAULT_AI_MODEL,
+    base_url: str = DEFAULT_AI_BASE_URL,
     timeout: int = 30,
 ) -> str:
     raw_text = call_deepseek(

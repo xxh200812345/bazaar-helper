@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BundledPython = Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
 $RuntimeDir = Join-Path $env:LOCALAPPDATA "BazaarHelper\runtime"
-$KeyFile = Join-Path $RuntimeDir "deepseek_api_key.txt"
+$KeyFile = Join-Path $RuntimeDir "ai_api_key.txt"
 $Port = 8765
 $Url = "http://127.0.0.1:$Port"
 
@@ -47,7 +47,7 @@ Write-Host $Url
 Write-Host ""
 
 if ((Get-Item $KeyFile).Length -eq 0) {
-    Write-Host "提示：DeepSeek key 文件还是空的：" -ForegroundColor Yellow
+    Write-Host "提示：API key 文件还是空的：" -ForegroundColor Yellow
     Write-Host $KeyFile
     Write-Host "如果要用 AI 分析，把 key 直接粘进去，只保留一行。"
 }
