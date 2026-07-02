@@ -6,12 +6,17 @@ $DistRoot = Join-Path $ProjectRoot "dist\BazaarHelper"
 $VenvSitePackages = Join-Path $ProjectRoot ".venv\Lib\site-packages"
 $BundledPython = Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
 $InternalTestKey = Join-Path $ProjectRoot "runtime\deepseek_api_key.txt"
+$VersionFile = Join-Path $ProjectRoot "VERSION"
 
 Set-Location $ProjectRoot
 
 if (-not (Test-Path $BundledPython)) {
     throw "Python not found: $BundledPython"
 }
+if (-not (Test-Path $VersionFile)) {
+    throw "Version file not found: $VersionFile"
+}
+$ReleaseVersion = (Get-Content -LiteralPath $VersionFile -Raw -Encoding UTF8).Trim()
 
 $env:PYTHONPATH = $VenvSitePackages
 
@@ -58,6 +63,8 @@ Copy-Item -LiteralPath (Join-Path $DistRoot "_internal") -Destination $ReleaseRo
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "data") -Destination $ReleaseRoot -Recurse
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "examples") -Destination $ReleaseRoot -Recurse
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "start.bat") -Destination $ReleaseRoot
+Copy-Item -LiteralPath (Join-Path $ProjectRoot "update_helper.ps1") -Destination $ReleaseRoot
+Copy-Item -LiteralPath $VersionFile -Destination $ReleaseRoot
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "install_plugin.bat") -Destination $ReleaseRoot
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "set_ai_key.bat") -Destination $ReleaseRoot
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "README.md") -Destination $ReleaseRoot
@@ -70,6 +77,13 @@ Copy-Item `
     -LiteralPath (Join-Path $ProjectRoot "bepinex\BazaarStateExporter\bin\Release\net472\BazaarStateExporter.dll") `
     -Destination (Join-Path $ReleaseRoot "bepinex_plugin\BazaarStateExporter.dll")
 
+$versionInfo = [ordered]@{
+    name = "BazaarHelper"
+    version = $ReleaseVersion
+    built_at = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+}
+$versionInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ReleaseRoot "version.json") -Encoding UTF8
+
 Write-Host "[5/5] Verifying release files..."
 $requiredPaths = @(
     "BazaarHelper.exe",
@@ -77,6 +91,9 @@ $requiredPaths = @(
     "data",
     "examples",
     "start.bat",
+    "update_helper.ps1",
+    "VERSION",
+    "version.json",
     "install_plugin.bat",
     "set_ai_key.bat",
     "BazaarHelper_User_Guide.docx",

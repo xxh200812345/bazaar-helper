@@ -52,6 +52,16 @@ namespace BazaarStateExporter
             object dto = RuntimeStateCache.LatestGameStateSnapshot;
             if (dto == null)
             {
+                dto = TryRecoverInitialGameState();
+                if (dto != null)
+                {
+                    RuntimeStateCache.LatestGameStateSnapshot = dto;
+                    logger.LogInfo("Recovered current GameStateSnapshotDTO during polling.");
+                }
+            }
+
+            if (dto == null)
+            {
                 if (!warnedOnce)
                 {
                     logger.LogInfo("Waiting for NetMessageGameStateSync.");
