@@ -124,6 +124,32 @@ def available_heroes(data: dict[str, Any]) -> list[str]:
     )
 
 
+def build_belongs_to_hero(build_data: dict[str, Any], hero: str | None) -> bool:
+    if not hero:
+        return True
+
+    build_hero = build_data.get("hero")
+    return build_hero in (None, hero)
+
+
+def build_options_for_hero(
+    data: dict[str, Any],
+    hero: str | None = None,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "id": build_id,
+            "name": (
+                build_data.get("name")
+                or build_data.get("display_name")
+                or build_id
+            ),
+        }
+        for build_id, build_data in sorted(data["builds"].items())
+        if isinstance(build_data, dict) and build_belongs_to_hero(build_data, hero)
+    ]
+
+
 def choose_build(
     data: dict[str, Any],
     hero: str,
@@ -131,7 +157,11 @@ def choose_build(
     preferred: str | None = None,
     owned_cards: Any = None,
 ) -> str:
-    if preferred and preferred in data["builds"]:
+    if (
+        preferred
+        and preferred in data["builds"]
+        and build_belongs_to_hero(data["builds"][preferred], hero)
+    ):
         return preferred
 
     best_match = match_build_from_owned_cards(data, hero, day, owned_cards)
@@ -874,6 +904,51 @@ def display_card_names(data: dict[str, Any], cards: dict[str, str]) -> list[dict
     ]
 
 
+def display_build_card_names(data: dict[str, Any], card_names: Any) -> list[dict[str, str]]:
+    if not isinstance(card_names, list):
+        return []
+
+    return [
+        {
+            "name": str(name),
+            "display_name": zh_name(data, name),
+        }
+        for name in card_names
+        if name
+    ]
+
+
+def build_detail_for_state(data: dict[str, Any], build_name: str) -> dict[str, Any]:
+    build_data = data.get("builds", {}).get(build_name, {})
+    if not isinstance(build_data, dict):
+        build_data = {}
+
+    return {
+        "id": build_name,
+        "display_name": (
+            build_data.get("name")
+            or build_data.get("display_name")
+            or build_name
+        ),
+        "core_cards": display_build_card_names(data, build_data.get("core_cards", [])),
+        "transition_cards": display_build_card_names(
+            data,
+            build_data.get("transition_cards", []),
+        ),
+        "optional_cards": display_build_card_names(
+            data,
+            build_data.get("optional_cards", []),
+        ),
+        "wanted_tags": [
+            str(tag)
+            for tag in build_data.get("wanted_tags", [])
+            if tag
+        ]
+        if isinstance(build_data.get("wanted_tags", []), list)
+        else [],
+    }
+
+
 def display_card_type(data: dict[str, Any], card: dict[str, Any]) -> str:
     card_type = card.get("card_type") or card.get("type")
     if card_type:
@@ -1402,6 +1477,7 @@ def analyze_payload(
                 or data.get("builds", {}).get(state.build, {}).get("display_name")
                 or state.build
             ),
+            "build_detail": build_detail_for_state(data, state.build),
             "day": state.day,
             "game_stage": get_game_stage_for_day(state.day),
             "game_stage_display": STAGE_LABELS_ZH.get(
@@ -1569,22 +1645,12 @@ class BazaarHandler(BaseHTTPRequestHandler):
                 self.send_json({"path": str(path), "payload": payload})
                 return
             if parsed.path == "/api/options":
-                build_options = [
-                    {
-                        "id": build_id,
-                        "name": (
-                            build_data.get("name")
-                            or build_data.get("display_name")
-                            or build_id
-                        ),
-                    }
-                    for build_id, build_data in sorted(self.data["builds"].items())
-                    if isinstance(build_data, dict)
-                ]
+                hero = query.get("hero", [None])[0]
+                build_options = build_options_for_hero(self.data, hero)
                 self.send_json(
                     {
                         "heroes": available_heroes(self.data),
-                        "builds": sorted(self.data["builds"].keys()),
+                        "builds": [build["id"] for build in build_options],
                         "build_options": build_options,
                         "events": sorted(self.data["events"].keys()),
                     }
@@ -1749,6 +1815,44 @@ HTML_PAGE = r"""<!doctype html>
       font-size: 12px;
       margin-bottom: 3px;
     }
+    .metric-button {
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+    }
+    .metric-button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .build-detail {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #111518;
+      padding: 10px;
+      margin: 10px 0 14px;
+    }
+    .build-detail.open { display: block; }
+    .build-detail h3 {
+      margin: 10px 0 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .build-detail h3:first-child { margin-top: 0; }
+    .build-detail .list { margin-bottom: 8px; }
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      padding: 2px 7px;
+      font-size: 12px;
+    }
     .panel-title {
       margin: 18px 0 8px;
       color: var(--muted);
@@ -1849,7 +1953,10 @@ HTML_PAGE = r"""<!doctype html>
         <div class="metric"><span>声望</span><strong id="prestige">-</strong></div>
         <div class="metric"><span>收入</span><strong id="income">-</strong></div>
       </div>
-      <div class="metric"><span>阵容目标</span><strong id="build">-</strong><div class="muted" id="stage">-</div></div>
+      <div class="metric metric-button" id="buildMetric" role="button" tabindex="0" aria-expanded="false">
+        <span>阵容目标</span><strong id="build">-</strong><div class="muted" id="stage">-</div>
+      </div>
+      <div class="build-detail" id="buildDetail"></div>
       <h2 class="panel-title">当前事件</h2>
       <div class="list" id="currentEvents"></div>
       <h2 class="panel-title">已拥有物品</h2>
@@ -1870,7 +1977,12 @@ HTML_PAGE = r"""<!doctype html>
     const messageEl = document.querySelector("#message");
     const aiBox = document.querySelector("#aiBox");
     const buildSelect = document.querySelector("#buildSelect");
+    const buildMetric = document.querySelector("#buildMetric");
+    const buildDetail = document.querySelector("#buildDetail");
     let aiRequestInFlight = false;
+    let currentBuildIds = [];
+    let currentOptionsHero = null;
+    let buildDetailOpen = false;
 
     function pct(value) {
       return `${Math.round((value || 0) * 100)}%`;
@@ -1882,19 +1994,27 @@ HTML_PAGE = r"""<!doctype html>
       return "badge";
     }
 
-    async function loadOptions() {
-      const res = await fetch("/api/options");
+    async function loadOptions(hero = null, preferredBuild = null) {
+      const url = hero ? `/api/options?hero=${encodeURIComponent(hero)}` : "/api/options";
+      const previousBuild = preferredBuild ?? buildSelect.value;
+      const res = await fetch(url, { cache: "no-store" });
       const data = await res.json();
+      currentBuildIds = data.builds || [];
+      currentOptionsHero = hero || null;
       buildSelect.innerHTML = [
         `<option value="">自动匹配已有卡牌</option>`,
         ...(data.build_options || data.builds.map((id) => ({ id, name: id })))
           .map((build) => `<option value="${build.id}">${build.name}</option>`),
       ].join("");
       const savedBuild = localStorage.getItem("bazaar_selected_build");
-      if (savedBuild === "") {
+      if (previousBuild && currentBuildIds.includes(previousBuild)) {
+        buildSelect.value = previousBuild;
+      } else if (savedBuild === "") {
         buildSelect.value = "";
-      } else if (savedBuild && data.builds.includes(savedBuild)) {
+      } else if (savedBuild && currentBuildIds.includes(savedBuild)) {
         buildSelect.value = savedBuild;
+      } else {
+        buildSelect.value = "";
       }
     }
 
@@ -1937,6 +2057,12 @@ HTML_PAGE = r"""<!doctype html>
       }
 
       const state = data.state || {};
+      if (state.hero && currentOptionsHero !== state.hero) {
+        await loadOptions(state.hero, selectedBuild);
+      } else if (selectedBuild && !currentBuildIds.includes(selectedBuild)) {
+        buildSelect.value = "";
+        localStorage.setItem("bazaar_selected_build", "");
+      }
       document.querySelector("#hero").textContent = state.hero || "-";
       document.querySelector("#day").textContent = state.day || "-";
       document.querySelector("#gold").textContent = state.gold ?? "-";
@@ -1945,7 +2071,10 @@ HTML_PAGE = r"""<!doctype html>
       document.querySelector("#income").textContent = state.income ?? "-";
       document.querySelector("#build").textContent = state.build_display_name || state.build || "-";
       document.querySelector("#stage").textContent = state.game_stage_display || state.game_stage || "-";
-      if (selectedBuild && state.build) buildSelect.value = state.build;
+      if (selectedBuild && state.build && currentBuildIds.includes(state.build)) {
+        buildSelect.value = state.build;
+      }
+      renderBuildDetail(state.build_detail || null);
       renderStateLists(state);
 
       if (data.warnings && data.warnings.length) {
@@ -2069,6 +2198,42 @@ HTML_PAGE = r"""<!doctype html>
       );
     }
 
+    function renderBuildDetail(detail) {
+      if (!detail) {
+        buildDetail.innerHTML = `<div class="muted">暂无</div>`;
+        return;
+      }
+
+      const sections = [
+        ["核心卡", detail.core_cards || []],
+        ["过渡卡", detail.transition_cards || []],
+        ["可选卡", detail.optional_cards || []],
+      ].map(([title, cards]) => `
+        <h3>${title}</h3>
+        <div class="list">
+          ${cards.length ? cards.map((card) => `
+            <div class="list-item"><span>${card.display_name || card.name}</span></div>
+          `).join("") : `<div class="muted">暂无</div>`}
+        </div>
+      `).join("");
+
+      const tags = detail.wanted_tags || [];
+      const tagSection = tags.length ? `
+        <h3>需求标签</h3>
+        <div class="tag-row">${tags.map((tag) => `<span class="tag">${tag}</span>`).join("")}</div>
+      ` : "";
+
+      buildDetail.innerHTML = sections + tagSection;
+      buildDetail.classList.toggle("open", buildDetailOpen);
+      buildMetric.setAttribute("aria-expanded", buildDetailOpen ? "true" : "false");
+    }
+
+    function toggleBuildDetail() {
+      buildDetailOpen = !buildDetailOpen;
+      buildDetail.classList.toggle("open", buildDetailOpen);
+      buildMetric.setAttribute("aria-expanded", buildDetailOpen ? "true" : "false");
+    }
+
     function formatPrestige(state) {
       if (state.prestige == null) return "-";
       if (state.max_prestige == null) return state.prestige;
@@ -2111,8 +2276,17 @@ HTML_PAGE = r"""<!doctype html>
       aiBox.innerHTML = "";
       analyze(false);
     });
+    buildMetric.addEventListener("click", toggleBuildDetail);
+    buildMetric.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleBuildDetail();
+      }
+    });
 
-    loadOptions().then(loadState).then(() => analyze(false));
+    loadState()
+      .then((state) => loadOptions(state && state.hero ? state.hero : null))
+      .then(() => analyze(false));
     setInterval(() => analyze(false), 3000);
   </script>
 </body>

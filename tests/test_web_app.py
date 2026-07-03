@@ -113,6 +113,70 @@ class WebAppResilienceTests(unittest.TestCase):
 
             self.assertTrue(web_app.runtime_state_is_plugin_owned(state_path))
 
+    def test_build_options_filter_to_current_hero(self) -> None:
+        data = {
+            "builds": {
+                "VanessaBuild": {"hero": "Vanessa", "display_name": "Vanessa"},
+                "DooleyBuild": {"hero": "Dooley", "display_name": "Dooley"},
+                "SharedBuild": {"display_name": "Shared"},
+            }
+        }
+
+        options = web_app.build_options_for_hero(data, "Vanessa")
+
+        self.assertEqual(
+            [option["id"] for option in options],
+            ["SharedBuild", "VanessaBuild"],
+        )
+
+    def test_choose_build_ignores_other_hero_override(self) -> None:
+        data = {
+            "cards": {},
+            "builds": {
+                "VanessaBuild": {"hero": "Vanessa"},
+                "DooleyBuild": {"hero": "Dooley"},
+            },
+        }
+
+        build = web_app.choose_build(
+            data,
+            hero="Vanessa",
+            day=5,
+            preferred="DooleyBuild",
+            owned_cards=[],
+        )
+
+        self.assertEqual(build, "VanessaBuild")
+
+    def test_build_detail_includes_displayed_card_groups(self) -> None:
+        data = {
+            "translations": {
+                "by_name": {
+                    "Core One": "核心一",
+                    "Transition One": "过渡一",
+                    "Optional One": "可选一",
+                }
+            },
+            "builds": {
+                "VanessaBuild": {
+                    "hero": "Vanessa",
+                    "display_name": "Vanessa Test",
+                    "core_cards": ["Core One"],
+                    "transition_cards": ["Transition One"],
+                    "optional_cards": ["Optional One"],
+                    "wanted_tags": ["ammo"],
+                }
+            },
+        }
+
+        detail = web_app.build_detail_for_state(data, "VanessaBuild")
+
+        self.assertEqual(detail["display_name"], "Vanessa Test")
+        self.assertEqual(detail["core_cards"][0]["display_name"], "核心一")
+        self.assertEqual(detail["transition_cards"][0]["display_name"], "过渡一")
+        self.assertEqual(detail["optional_cards"][0]["display_name"], "可选一")
+        self.assertEqual(detail["wanted_tags"], ["ammo"])
+
     def test_owned_items_and_skills_are_displayed_separately(self) -> None:
         data = {
             "events": {},
