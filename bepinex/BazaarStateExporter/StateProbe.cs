@@ -39,17 +39,18 @@ namespace BazaarStateExporter
                 return CreateNewRunTransitionSnapshot();
             }
 
+            object dto = RuntimeStateCache.LatestGameStateSnapshot;
             object processor = RuntimeStateCache.NetMessageProcessor;
-            if (processor != null)
+            if (dto == null && processor != null)
             {
                 object latestDto = TryReadLatestGameStateFromProcessor(processor);
                 if (latestDto != null)
                 {
                     RuntimeStateCache.LatestGameStateSnapshot = latestDto;
+                    dto = latestDto;
                 }
             }
 
-            object dto = RuntimeStateCache.LatestGameStateSnapshot;
             if (dto == null)
             {
                 dto = TryRecoverInitialGameState();
@@ -136,18 +137,46 @@ namespace BazaarStateExporter
 
         private static object TryGetDataFromGameStateMessage(object message)
         {
+            return TryGetGameStateDtoFromMessage(message);
+        }
+
+        public static object TryGetGameStateDtoFromMessage(object message)
+        {
             if (message == null)
             {
                 return null;
             }
 
             Type type = message.GetType();
-            if (type.FullName != "BazaarGameShared.Infra.Messages.NetMessageGameStateSync")
+            string fullName = type.FullName ?? "";
+            if (fullName != "BazaarGameShared.Infra.Messages.NetMessageGameStateSync"
+                && fullName.IndexOf(
+                    "GameStateSync",
+                    StringComparison.OrdinalIgnoreCase) < 0)
             {
                 return null;
             }
 
-            return GetProperty(message, "Data");
+            object data = GetProperty(message, "Data");
+            return LooksLikeGameStateDto(data) ? data : null;
+        }
+
+        public static bool LooksLikeGameStateDto(object dto)
+        {
+            if (dto == null)
+            {
+                return false;
+            }
+
+            object run = GetField(dto, "Run");
+            object player = GetField(dto, "Player");
+            if (run == null || player == null)
+            {
+                return false;
+            }
+
+            string hero = StringValue(GetField(player, "Hero"));
+            return !string.IsNullOrEmpty(hero);
         }
 
         public void LogRuntimeHints()

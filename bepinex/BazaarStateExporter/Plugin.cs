@@ -13,7 +13,7 @@ namespace BazaarStateExporter
     {
         public const string PluginGuid = "local.bazaar.stateexporter";
         public const string PluginName = "Bazaar State Exporter";
-        public const string PluginVersion = "0.7.9";
+        public const string PluginVersion = "0.7.10";
 
         private ConfigEntry<string> outputPath;
         private ConfigEntry<float> pollIntervalSeconds;

@@ -2079,5 +2079,438 @@
     "wanted_tags": [],
     "event_priorities": [],
     "avoid_events": []
+  },
+  "gongzuotai": {
+    "hero": "Jules",
+    "display_name": "工作台（前期）",
+    "applicable_stages": [
+      "early"
+    ],
+    "day_range": [
+      1,
+      null
+    ],
+    "build_summary": "工作台",
+    "match_notes": [],
+    "pilot_tips": [
+      "不要随意选商店，多拿资源",
+      "一定要刷新"
+    ],
+    "core_cards": [
+      "Prep Station",
+      "Knife Sharpener",
+      "Microwave",
+      "Bread Knife",
+      "Instant Noodles",
+      "Pasta Maker"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Mouse Trap",
+      "Spatula",
+      "Oven Mitts",
+      "Scorchpepper",
+      "LauLau",
+      "Banu Leaves",
+      "Pasta",
+      "Sorbet",
+      "Zarlic",
+      "Honeycomb",
+      "Skewer",
+      "Azakan Stew",
+      "Strawberries",
+      "Coffee"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "tusiji": {
+    "hero": "Jules",
+    "display_name": "吐司机（慎用）",
+    "applicable_stages": [
+      "early"
+    ],
+    "day_range": [
+      1,
+      null
+    ],
+    "build_summary": "吐司机",
+    "match_notes": [],
+    "pilot_tips": [
+      "不要随意选商店，多拿资源",
+      "一定要刷新"
+    ],
+    "core_cards": [
+      "Toaster",
+      "Instant Noodles",
+      "Coffee",
+      "Knife Sharpener",
+      "Pasta Maker"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Banu Leaves",
+      "Baked Potato",
+      "Cookies",
+      "Pancakes",
+      "Skillet",
+      "Black Pepper",
+      "Honeycomb",
+      "Sushi Boat"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "nangua": {
+    "hero": "Jules",
+    "display_name": "南瓜（前期）",
+    "applicable_stages": [
+      "early"
+    ],
+    "day_range": [
+      1,
+      null
+    ],
+    "build_summary": "南瓜（前期）",
+    "match_notes": [],
+    "pilot_tips": [
+      "不要随意选商店，多拿资源",
+      "一定要刷新"
+    ],
+    "core_cards": [
+      "Pumpkin",
+      "Coffee",
+      "Pasta",
+      "Eggs",
+      "Strawberries",
+      "Pasta Maker"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Sushi Boat",
+      "Baked Potato",
+      "Pancakes",
+      "Microwave",
+      "Azakan Stew"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "mianbao": {
+    "hero": "Jules",
+    "display_name": "面包（中期）",
+    "applicable_stages": [
+      "mid"
+    ],
+    "day_range": [
+      4,
+      null
+    ],
+    "build_summary": "面包（中期）",
+    "match_notes": [],
+    "pilot_tips": [
+      "不要随意选商店，多拿资源",
+      "一定要刷新"
+    ],
+    "core_cards": [
+      "Bread",
+      "Coffee",
+      "Microwave",
+      "Pasta",
+      "Bread Knife",
+      "Refrigerator",
+      "Pasta Maker"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Black Pepper",
+      "Food Truck",
+      "Instant Noodles",
+      "Mouse Trap"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "dangaohu": {
+    "hero": "Jules",
+    "display_name": "蛋糕糊（中期）",
+    "applicable_stages": [
+      "mid"
+    ],
+    "day_range": [
+      4,
+      null
+    ],
+    "build_summary": "蛋糕糊（中期）",
+    "match_notes": [],
+    "pilot_tips": [
+      "不要随意选商店，多拿资源",
+      "一定要刷新"
+    ],
+    "core_cards": [
+      "Cake Batter",
+      "Bread Knife",
+      "Zarlic",
+      "Refrigerator"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Oven Mitts",
+      "Laurel's Fortress",
+      "Mouse Trap",
+      "Building Crescendo",
+      "Static Acceleration",
+      "Tracer Fire",
+      "Reaching the Summit",
+      "Meat Tenderizer",
+      "Whisk",
+      "Eggs",
+      "Giant Sub",
+      "Gingerbread House"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "bingxiang": {
+    "hero": "Jules",
+    "display_name": "冰箱",
+    "applicable_stages": [
+      "early"
+    ],
+    "day_range": [
+      1,
+      null
+    ],
+    "build_summary": "冰箱",
+    "match_notes": [],
+    "pilot_tips": [
+      "不要随意选商店，多拿资源",
+      "一定要刷新"
+    ],
+    "core_cards": [
+      "Coffee",
+      "Pumpkin",
+      "Pasta",
+      "Cake Batter",
+      "Pasta Maker",
+      "Instant Noodles",
+      "Bread Knife",
+      "Ice Swan",
+      "Refrigerator"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Banu Leaves",
+      "Strawberries",
+      "Scorchpepper",
+      "LauLau"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "bingxiangzhongqi": {
+    "hero": "Jules",
+    "display_name": "冰箱（中期）",
+    "applicable_stages": [
+      "mid"
+    ],
+    "day_range": [
+      4,
+      null
+    ],
+    "build_summary": "冰箱（中期）",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Coffee",
+      "Pumpkin",
+      "Pasta",
+      "Bread Knife",
+      "Zarlic",
+      "Ice Swan",
+      "Cake Batter",
+      "Pasta Maker",
+      "Instant Noodles",
+      "Refrigerator"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Banu Leaves",
+      "Strawberries",
+      "Building Crescendo",
+      "Static Acceleration",
+      "Tracer Fire",
+      "Scorchpepper",
+      "LauLau"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "shichangbingxiang": {
+    "hero": "Jules",
+    "display_name": "市场冰箱（市场）",
+    "applicable_stages": [
+      "late"
+    ],
+    "day_range": [
+      7,
+      null
+    ],
+    "build_summary": "市场冰箱（市场）",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Zarlic",
+      "Froyo Cart",
+      "Farmer's Market",
+      "Pasta",
+      "Bread Knife",
+      "Refrigerator",
+      "Sorbet",
+      "Ice Swan"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Building Crescendo",
+      "Static Acceleration",
+      "Tracer Fire"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "guazhi": {
+    "hero": "Jules",
+    "display_name": "瓜治",
+    "applicable_stages": [
+      "late"
+    ],
+    "day_range": [
+      7,
+      null
+    ],
+    "build_summary": "瓜治",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Giant Sub",
+      "Mouse Trap",
+      "Dragonmelon",
+      "Bread Knife"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Farmer's Market",
+      "Pasta",
+      "Durian",
+      "Meat Tenderizer"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "caishichang": {
+    "hero": "Jules",
+    "display_name": "菜市场",
+    "applicable_stages": [
+      "late"
+    ],
+    "day_range": [
+      7,
+      null
+    ],
+    "build_summary": "菜市场",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Zarlic",
+      "Farmer's Market",
+      "Pasta",
+      "Bread Knife",
+      "Veggie Garden"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Building Crescendo",
+      "Static Acceleration",
+      "Tracer Fire",
+      "Meat Tenderizer",
+      "Mouse Trap",
+      "Poke"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "tiaoliaojia": {
+    "hero": "Jules",
+    "display_name": "调料架",
+    "applicable_stages": [
+      "mid"
+    ],
+    "day_range": [
+      4,
+      null
+    ],
+    "build_summary": "调料架",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Zarlic",
+      "Ice Swan",
+      "Sorbet",
+      "Instant Noodles",
+      "Salt"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Building Crescendo",
+      "Static Acceleration",
+      "Tracer Fire",
+      "Meat Tenderizer",
+      "LauLau",
+      "Scorchpepper",
+      "Black Pepper"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
+  },
+  "yongdongsuinanche": {
+    "hero": "Jules",
+    "display_name": "永冻酸奶",
+    "applicable_stages": [
+      "late"
+    ],
+    "day_range": [
+      7,
+      null
+    ],
+    "build_summary": "永冻酸奶",
+    "match_notes": [],
+    "pilot_tips": [],
+    "core_cards": [
+      "Sorbet",
+      "Ice Swan",
+      "Froyo Cart",
+      "Farmer's Market",
+      "Meat Tenderizer",
+      "Refrigerator"
+    ],
+    "transition_cards": [],
+    "optional_cards": [
+      "Caviar",
+      "Pasta"
+    ],
+    "wanted_tags": [],
+    "event_priorities": [],
+    "avoid_events": []
   }
 }
