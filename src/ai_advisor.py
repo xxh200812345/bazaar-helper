@@ -13,8 +13,8 @@ from recommender import format_resource_rewards
 from app_paths import get_runtime_dir
 
 
-DEFAULT_AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.deepseek.com")
-DEFAULT_AI_MODEL = os.environ.get("AI_MODEL", "deepseek-chat")
+DEFAULT_AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+DEFAULT_AI_MODEL = os.environ.get("AI_MODEL", "gemini-2.5-flash")
 DEFAULT_API_KEY_FILE = get_runtime_dir() / "ai_api_key.txt"
 LEGACY_API_KEY_FILE = get_runtime_dir() / "deepseek_api_key.txt"
 STAGE_LABELS_ZH = {
