@@ -382,6 +382,14 @@ namespace BazaarStateExporter
             object message = __0;
             try
             {
+                object gameStateDto = StateProbe.TryGetGameStateDtoFromMessage(message);
+                if (gameStateDto != null)
+                {
+                    RuntimeStateCache.LatestGameStateSnapshot = gameStateDto;
+                    RuntimeStateCache.Logger?.LogInfo(
+                        "Captured NetMessageGameStateSync via generic Handle patch.");
+                }
+
                 int? gold;
                 int? health;
                 if (ResourceReflection.TryExtract(message, out gold, out health))
